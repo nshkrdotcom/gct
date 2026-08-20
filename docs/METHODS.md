@@ -51,7 +51,9 @@ rank, generator dimension, and residual-probe dimension are chosen on validation
 Operators are identity, mean shift, PCA-affine ridge, factored low-rank residual transport, and a
 PCA-space continuous generator. The low-rank forward pass is
 `z + (z @ B.T) @ A.T + b`; no full `d x d` product is formed. Generator prediction uses a matrix
-exponential and held-out magnitudes.
+exponential and held-out magnitudes. Train PCA uses a fixed-seed randomized SVD when truncated;
+candidate dimensions slice one train-fit basis, and nested rank candidates slice one residual SVD.
+These mechanical caches change neither the candidate sets nor validation scores.
 
 Distances are raw cosine, train-standardized RMS L2, and train-PCA-whitened RMS L2. The latter is
 primary. The experiment reports transport, cycle, commuting-square, matching/descent, and generator

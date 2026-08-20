@@ -81,3 +81,27 @@ class LowRankResidualTransport:
         model.b = arrays["b"]
         model.bias = arrays["bias"]
         return model
+
+
+def fit_rank_candidates(
+    source: np.ndarray, target: np.ndarray, ranks: list[int], alpha: float
+) -> dict[int, LowRankResidualTransport]:
+    """Fit nested rank candidates from one shared residual SVD basis."""
+    if not ranks or any(rank < 1 for rank in ranks):
+        raise ValueError("rank candidates must be positive and nonempty")
+    x = np.asarray(source, dtype=np.float32)
+    y = np.asarray(target, dtype=np.float32)
+    largest = LowRankResidualTransport(max(ranks), alpha).fit(x, y)
+    if largest.a is None or largest.b is None:
+        raise RuntimeError("shared low-rank basis was not fitted")
+    residual_mean = (y - x).mean(axis=0)
+    x_mean = x.mean(axis=0)
+    candidates: dict[int, LowRankResidualTransport] = {}
+    for rank in sorted(set(ranks)):
+        actual = min(rank, largest.a.shape[1])
+        model = LowRankResidualTransport(rank, alpha)
+        model.a = largest.a[:, :actual].copy()
+        model.b = largest.b[:actual].copy()
+        model.bias = residual_mean - (x_mean @ model.b.T) @ model.a.T
+        candidates[rank] = model
+    return candidates

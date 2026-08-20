@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
+from sklearn.decomposition import PCA
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,13 +24,21 @@ class PCASpace:
         dimension = min(n_components, matrix.shape[0] - 1, matrix.shape[1])
         if dimension < 1:
             raise ValueError("PCA retained dimension must be positive")
-        mean = matrix.mean(axis=0)
-        centered = matrix - mean
-        _, singular, vt = np.linalg.svd(centered, full_matrices=False)
-        components = vt[:dimension]
-        variance = singular[:dimension] ** 2 / (len(matrix) - 1)
+        solver = "randomized" if dimension < min(matrix.shape) else "full"
+        estimator = PCA(
+            n_components=dimension,
+            svd_solver=solver,
+            random_state=0 if solver == "randomized" else None,
+        )
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore", message="invalid value encountered in divide", category=RuntimeWarning
+            )
+            estimator.fit(matrix)
         return cls(
-            mean.astype(np.float32), components.astype(np.float32), variance.astype(np.float32)
+            estimator.mean_.astype(np.float32),
+            estimator.components_.astype(np.float32),
+            estimator.explained_variance_.astype(np.float32),
         )
 
     def transform(self, values: np.ndarray, *, whiten: bool = False) -> np.ndarray:

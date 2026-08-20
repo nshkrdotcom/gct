@@ -17,7 +17,8 @@ from gct.metrics.distances import MetricSpace
 from gct.operators.affine import AffineRidgeTransport
 from gct.operators.baselines import IdentityTransport, MeanShiftTransport
 from gct.operators.generator import ContinuousGeneratorTransport
-from gct.operators.low_rank import LowRankResidualTransport
+from gct.operators.low_rank import fit_rank_candidates
+from gct.preprocessing.pca import PCASpace
 from gct.provenance import update_run_manifest
 from gct.storage.hashes import canonical_hash, file_hash
 from gct.storage.manifests import artifact_record, read_json, write_json_atomic
@@ -50,6 +51,18 @@ def _fit_metric_space(frame: pd.DataFrame, values: np.ndarray, dimension: int) -
     return MetricSpace.fit(train, dimension)
 
 
+def _slice_metric_space(space: MetricSpace, dimension: int) -> MetricSpace:
+    actual = min(dimension, space.pca.components.shape[0])
+    return MetricSpace(
+        space.standardizer,
+        PCASpace(
+            space.pca.mean,
+            space.pca.components[:actual],
+            space.pca.explained_variance[:actual],
+        ),
+    )
+
+
 def _candidate_scan(config: ExperimentConfig, run_dir: Path) -> pd.DataFrame:
     rows: list[dict[str, Any]] = []
     for layer in _available_layers(run_dir):
@@ -58,15 +71,22 @@ def _candidate_scan(config: ExperimentConfig, run_dir: Path) -> pd.DataFrame:
         validation = paired_data(frame, values, group=PRIMARY_OPERATOR_GROUP, split="validation")
         if len(train.metadata) < 2 or len(validation.metadata) < 1:
             raise ValueError("primary operator group lacks train/validation pairs")
+        full_space = _fit_metric_space(frame, values, max(config.preprocessing.pca_dims))
+        rank_models = fit_rank_candidates(
+            train.source,
+            train.target,
+            config.operators.low_rank.ranks,
+            config.operators.low_rank.ridge_alpha,
+        )
+        predictions = {
+            rank: model.predict(validation.source) for rank, model in rank_models.items()
+        }
         for dimension in config.preprocessing.pca_dims:
-            space = _fit_metric_space(frame, values, dimension)
+            space = _slice_metric_space(full_space, dimension)
             identity = space.distances(validation.source, validation.target)
             for rank in config.operators.low_rank.ranks:
-                model = LowRankResidualTransport(
-                    rank=rank, alpha=config.operators.low_rank.ridge_alpha
-                ).fit(train.source, train.target)
-                predicted = model.predict(validation.source)
-                distances = space.distances(predicted, validation.target)
+                model = rank_models[rank]
+                distances = space.distances(predictions[rank], validation.target)
                 rows.append(
                     {
                         "fit_split": "train",
@@ -118,7 +138,9 @@ def fit_transport_operators(config: ExperimentConfig, repo_root: Path) -> Path:
     layer = int(selection["primary_layer"])
     pca_dimension = int(selection["pca_dimension"])
     frame, values = load_layer_dataset(run_dir, layer)
-    space = _fit_metric_space(frame, values, pca_dimension)
+    space = _slice_metric_space(
+        _fit_metric_space(frame, values, max(config.preprocessing.pca_dims)), pca_dimension
+    )
     preprocessing_dir = run_dir / "preprocessing"
     preprocessing_dir.mkdir(parents=True, exist_ok=True)
     space_path = preprocessing_dir / "metric_space.safetensors"
@@ -157,11 +179,14 @@ def fit_transport_operators(config: ExperimentConfig, repo_root: Path) -> Path:
         validation = paired_data(frame, values, group=group, split="validation")
         if len(train.metadata) < 2 or len(validation.metadata) < 1:
             continue
+        rank_models = fit_rank_candidates(
+            train.source,
+            train.target,
+            config.operators.low_rank.ranks,
+            config.operators.low_rank.ridge_alpha,
+        )
         rank_scores: list[tuple[float, int]] = []
-        for rank in config.operators.low_rank.ranks:
-            candidate = LowRankResidualTransport(rank, config.operators.low_rank.ridge_alpha).fit(
-                train.source, train.target
-            )
+        for rank, candidate in rank_models.items():
             score = float(
                 np.mean(
                     space.distances(candidate.predict(validation.source), validation.target)[
@@ -177,9 +202,7 @@ def fit_transport_operators(config: ExperimentConfig, repo_root: Path) -> Path:
             AffineRidgeTransport(pca_dimension, config.operators.affine_ridge_alpha).fit(
                 train.source, train.target
             ),
-            LowRankResidualTransport(selected_rank, config.operators.low_rank.ridge_alpha).fit(
-                train.source, train.target
-            ),
+            rank_models[selected_rank],
         ]
         group_dir = output_dir / group_slug(group)
         for model in models:

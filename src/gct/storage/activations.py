@@ -11,7 +11,8 @@ from typing import Any, TypeVar
 
 import pandas as pd
 import torch
-from safetensors.torch import load_file, save_file
+from safetensors import safe_open
+from safetensors.torch import save_file
 
 from gct.config import ExperimentConfig
 from gct.data.generate import validate_dataset_path
@@ -264,8 +265,9 @@ def load_activation_layer(run_dir: Path, layer_number: int) -> tuple[pd.DataFram
         layer_numbers = [int(value) for value in record["layer_numbers"]]
         if layer_number not in layer_numbers:
             raise ValueError(f"layer {layer_number} was not extracted")
-        tensors = load_file(run_dir / str(record["path"]), device="cpu")
-        pieces.append(tensors["activations"][:, layer_numbers.index(layer_number), :])
+        with safe_open(run_dir / str(record["path"]), framework="pt", device="cpu") as tensors:
+            activation_slice = tensors.get_slice("activations")
+            pieces.append(activation_slice[:, layer_numbers.index(layer_number), :])
     values = torch.cat(pieces, dim=0)
     if len(values) != len(index):
         raise RuntimeError("activation tensor/index row count mismatch")

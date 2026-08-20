@@ -28,6 +28,15 @@ def test_metric_space_is_train_fit() -> None:
     assert all(np.allclose(value, 0, atol=1e-6) for value in distances.values())
 
 
+def test_train_pca_randomized_solver_is_deterministic() -> None:
+    rng = np.random.default_rng(11)
+    values = rng.normal(size=(80, 30))
+    first = PCASpace.fit(values, 8)
+    second = PCASpace.fit(values, 8)
+    assert np.array_equal(first.components, second.components)
+    assert np.array_equal(first.explained_variance, second.explained_variance)
+
+
 def test_normalized_improvement_handles_zero_identity() -> None:
     values = normalized_improvement(np.array([1.0, 0.5]), np.array([0.0, 1.0]))
     assert np.isnan(values[0])

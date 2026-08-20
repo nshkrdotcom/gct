@@ -8,7 +8,7 @@ import pytest
 from gct.operators.affine import AffineRidgeTransport
 from gct.operators.baselines import IdentityTransport, MeanShiftTransport
 from gct.operators.generator import ContinuousGeneratorTransport
-from gct.operators.low_rank import LowRankResidualTransport
+from gct.operators.low_rank import LowRankResidualTransport, fit_rank_candidates
 
 
 def paired(seed: int = 7) -> tuple[np.ndarray, np.ndarray]:
@@ -38,6 +38,14 @@ def test_low_rank_factored_fit_and_serialization(tmp_path: Path) -> None:
     model.save(path, {"fit_split": "train"})
     loaded = LowRankResidualTransport.load(path)
     assert np.allclose(loaded.predict(source), prediction)
+
+
+def test_nested_rank_candidates_match_individual_fits() -> None:
+    source, target = paired()
+    candidates = fit_rank_candidates(source, target, [1, 2, 4], 1e-4)
+    for rank, candidate in candidates.items():
+        individually = LowRankResidualTransport(rank, 1e-4).fit(source, target)
+        assert np.allclose(candidate.predict(source), individually.predict(source), atol=1e-5)
 
 
 def test_affine_ridge_round_trip(tmp_path: Path) -> None:
