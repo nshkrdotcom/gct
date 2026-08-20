@@ -51,6 +51,26 @@ def _hypothesis_line(name: str, record: dict[str, Any]) -> str:
             f"H2:{record['H2']['status']}, H5:{record['H5']['status']}, "
             f"H6:{record['H6']['status']}, H7:{record['H7']['status']}"
         )
+        evidence.append(
+            f"renamed H2 effect={_fmt(record['H2']['estimate'])}; "
+            f"H5 R²={_fmt(record['H5']['test_r2'])}, "
+            f"p={_fmt(record['H5']['permutation_p_value'])}; "
+            f"H6 R²={_fmt(record['H6']['test_r2'])}, "
+            f"p={_fmt(record['H6']['permutation_p_value'])}; "
+            f"H7 structural effect={_fmt(record['H7']['estimate'])}"
+        )
+    if name == "H3":
+        evidence.append(
+            f"composition={_fmt(record['mean_generator_composition_defect'])}; "
+            f"square={_fmt(record['mean_commuting_square_defect'])}; "
+            f"composed-to-target={_fmt(record['mean_composed_route_to_target_defect'])}"
+        )
+    if name == "H7":
+        evidence.append(
+            f"Q structural={_fmt(record['structural_gain']['irrelevant_q']['estimate'])}; "
+            f"explicit behavior={_fmt(record['behavioral_gain']['explicit']['estimate'])}; "
+            f"Q behavior={_fmt(record['behavioral_gain']['irrelevant_q']['estimate'])}"
+        )
     if not evidence:
         evidence.append(str(record.get("endpoint", "see machine-readable result")))
     return f"| {name} | {record.get('title', '')} | {record['status']} | {'; '.join(evidence)} |"
@@ -83,6 +103,8 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
     selection = read_json(run_dir / "operators" / "selection_frozen.json")
     probes = read_json(run_dir / "probes" / "manifest.json")
     run_manifest = read_json(run_dir / "manifest.json")
+    quality_path = run_dir / "quality_gates.json"
+    quality = read_json(quality_path) if quality_path.exists() else None
     runtime = runtime_report(config)
     behavior_summary = pd.read_parquet(run_dir / "statistics" / "behavior_primary_summary.parquet")
     behavior_overall = behavior_summary[behavior_summary["scope"] == "all"].set_index("metric")
@@ -99,6 +121,39 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
     level = _interpretation_level(hypotheses)
     layer_scope = "all-layer" if config.activations.layers == "all" else "configured-layer"
     status_counts = pd.Series([record["status"] for record in hypotheses.values()]).value_counts()
+    activation_canonical = activations["duplicate_prompt_canonicalization"]
+    behavior_canonical = behavior["duplicate_prompt_canonicalization"]
+    if quality is None:
+        quality_lines = [
+            "- Final command-level gates have not yet been recorded in `quality_gates.json`; "
+            "rerun the README audit commands before interpreting this report as a final handoff."
+        ]
+        git_lines = [
+            f"- Commit at report build: `{git_commit(repo_root)}`",
+            "- Remote configured / push attempted / push verified: not yet recorded",
+        ]
+    else:
+        quality_lines = [
+            f"- Tests: `{quality['gates']['tests']['summary']}` "
+            f"(`{quality['gates']['tests']['command']}`)",
+            f"- Lint: `{quality['gates']['lint']['summary']}`",
+            f"- Format: `{quality['gates']['format']['summary']}`",
+            f"- Type checking: `{quality['gates']['types']['summary']}`",
+            f"- Real-model integration: `{quality['gates']['real_model_integration']['summary']}`",
+            f"- Split validation: `{quality['gates']['split_validation']['summary']}`",
+            f"- Deterministic regeneration: `{quality['gates']['dataset_regeneration']['summary']}`",
+            f"- Exact duplicate-prompt audit: `{quality['gates']['duplicate_prompt_audit']['summary']}`",
+            f"- Artifact verification: `{quality['gates']['artifact_verification']['summary']}`",
+            f"- Placeholder audit: `{quality['gates']['placeholder_audit']['summary']}`",
+        ]
+        git_lines = [
+            f"- Commit at report build: `{git_commit(repo_root)}`",
+            f"- Remote configured: `{quality['git']['remote_configured']}` "
+            f"(`{quality['git']['remote']}`)",
+            f"- Push attempted: `{quality['git']['push_attempted']}`",
+            f"- Push verified: `{quality['git']['push_verified']}` "
+            f"at `{quality['git']['verified_commit']}`",
+        ]
     lines = [
         "# Geometry of Conditional Truth — Run Report",
         "",
@@ -145,8 +200,7 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         f"- Common anchor token IDs: `{activations['anchor_suffix_token_ids']}`",
         f"- Frozen selection certifies test data used: `{selection['test_data_used']}`",
         f"- Probe permutation replicates: {probes['permutation_replicates']}",
-        "- Unit/lint/type gate results are recorded in the repository final handoff and may be "
-        "reproduced with the README commands.",
+        *quality_lines,
         "",
         "Held-out primary behavior metrics (grouped bootstrap by base world):",
         "",
@@ -165,7 +219,7 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         f"{dataset['counts']['base_worlds']} grouped base worlds. Split counts are "
         f"`{dataset['counts']['by_split']}`, arm counts are `{dataset['counts']['by_arm']}`, and "
         f"transformation counts are `{dataset['counts']['by_transform']}`. "
-        "The oracle is ToyThermo v1, computed exclusively in Python. Transformation magnitudes, "
+        f"The oracle is `{dataset['world_version']}`, computed exclusively in Python. Transformation magnitudes, "
         "the JSON-like renderer, and Cyrene entity evaluation follow the frozen held-out design.",
         "",
         "## 6. Preregistered hypotheses",
@@ -192,9 +246,22 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         "",
         f"The identical-prompt unobservable control status was `{hypotheses['H6']['status']}` "
         f"(test R² {_fmt(hypotheses['H6']['test_r2'])}; null 95th percentile "
-        f"{_fmt(hypotheses['H6']['null_r2_95th_percentile'])}). The irrelevant-Q comparison is "
-        "reported inside H7, and familiar-label semantic renaming inside H8. A failed H6 invalidates "
-        "positive hidden-coordinate interpretation until leakage is resolved.",
+        f"{_fmt(hypotheses['H6']['null_r2_95th_percentile'])}). H7's explicit-P structural gain was "
+        f"{_fmt(hypotheses['H7']['structural_gain']['explicit']['estimate'])}, versus "
+        f"{_fmt(hypotheses['H7']['structural_gain']['irrelevant_q']['estimate'])} for irrelevant Q; "
+        "the preregistered superiority rule was not met. In the familiar-label world, H2, H5, and "
+        "H7 remained unsupported while H6 again passed. A failed H6 would invalidate positive "
+        "hidden-coordinate interpretation until leakage was resolved.",
+        "",
+        f"Raw batched extraction showed numerical batch-boundary sensitivity in "
+        f"{activation_canonical['mismatched_rows_before_canonicalization']} of "
+        f"{activation_canonical['compared_duplicate_rows']} repeated activation rows (maximum stored "
+        f"difference {_fmt(activation_canonical['max_abs_difference_before_canonicalization'])}); "
+        f"generation differed in {behavior_canonical['mismatched_rows_before_canonicalization']} repeated "
+        "rows. Because identical token sequences cannot contain a row-specific hidden coordinate, the "
+        "preregistered `canonical_first_occurrence` policy rewrote each duplicate prompt from its first "
+        "dataset occurrence before analysis. The final exact audit is recorded above. An earlier "
+        "batch-sensitive run was superseded rather than reported.",
         "",
         "## 9. Interpretation level",
         "",
@@ -223,8 +290,7 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         "",
         "## 13. Git state",
         "",
-        f"- Commit at report build: `{git_commit(repo_root)}`",
-        "- Remote/push status is reported in the final handoff; report generation does not mutate remotes.",
+        *git_lines,
         "",
     ]
     report_text = "\n".join(lines)

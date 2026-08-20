@@ -54,7 +54,8 @@ uv run gct verify runs/<run-id>
 
 See [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md), [METHODS.md](docs/METHODS.md), and the
 machine-readable preregistration in the full config. Generated evidence is summarized in
-`REPORT.md`; limitations and incomplete hardware-dependent work are stated explicitly.
+`REPORT.md`; the report distinguishes the completed real-model run from engineering-only checks and
+states every negative result and limitation explicitly.
 
 ## Quality gates
 
@@ -63,4 +64,5 @@ uv run pytest -q
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy src/gct
+GCT_RUN_REAL_MODEL_TEST=1 uv run pytest -q tests/integration/test_real_qwen.py -m real_model
 ```

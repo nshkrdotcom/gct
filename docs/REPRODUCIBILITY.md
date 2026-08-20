@@ -19,7 +19,10 @@ Resume accepts only artifacts with matching config, dataset, model revision, ups
 and recursively checked content hashes. Completed valid activation shards are not recomputed. GPU
 kernels are deterministic to the extent
 supported by the pinned runtime, but cross-driver bitwise equality is not promised; semantic
-determinism and artifact hashes are recorded.
+determinism and artifact hashes are recorded. Within a run, repeated identical prompt hashes are
+canonicalized to their first dataset occurrence after raw inference. The activation and behavior
+manifests preserve the pre-canonicalization mismatch counts, and the final audit checks exact equality
+for the embedding, all transformer layers, and raw responses.
 
 Audit commands:
 
@@ -30,6 +33,7 @@ uv run pytest -q
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy src/gct
+GCT_RUN_REAL_MODEL_TEST=1 uv run pytest -q tests/integration/test_real_qwen.py -m real_model
 ```
 
 The engineering CI config has tiny samples and reduced layers/replicates. It validates code paths only.
