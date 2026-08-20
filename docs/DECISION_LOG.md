@@ -33,7 +33,10 @@
   together with direct-route and composed-route errors to observed targets.
 - The semantic-replication audit then found that entity labels were renamed but field symbols were
   not. Before any operator fitting or test statistic, the run was superseded with a versioned,
-  one-to-one `T/P/M/R/Q -> Z/X/Y/G/W` field map in addition to the familiar entity aliases.
+  one-to-one `T/P/M/R/Q/U -> Z/X/Y/G/W/V` field map in addition to the familiar entity aliases.
+- The scientific-QC checklist additionally required the unobservable arm to omit the pressure field
+  name, not only its value and proxy. Its sealed field is therefore opaque `U` in the primary world
+  and isomorphically renamed `V`; neither `P` nor `X` appears in its state description or law.
 - Pin Python 3.12 because the available Python 3.14 free-threaded interpreter lacked binary wheels for
   critical tensor dependencies. The package source remains Python 3.11+ compatible.
 - Use PyTorch 2.12.0+cu130 following current Blackwell guidance and record the full lock hash.

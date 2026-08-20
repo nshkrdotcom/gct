@@ -459,6 +459,13 @@ def validate_dataset_frame(frame: pd.DataFrame, config: ExperimentConfig) -> dic
             raise ValueError("unobservable prompt changed when only hidden pressure changed")
         if _number_for_leakage_check(float(cast(Any, row.pressure))) in str(row.prompt):
             raise ValueError("unobservable prompt contains the literal hidden pressure value")
+        forbidden_names = (
+            ("Pressure P", "Calibration reading R", "ln(P)")
+            if row.world_variant == "primary"
+            else ("Control X", "Proxy G", "ln(X)")
+        )
+        if any(name in str(row.prompt) for name in forbidden_names):
+            raise ValueError("unobservable prompt contains a pressure field name or proxy name")
         observable = json.loads(str(row.observable_json))
         if any(key in observable for key in ("pressure", "sensor_reading")):
             raise ValueError("unobservable prompt metadata leaks pressure or its proxy")

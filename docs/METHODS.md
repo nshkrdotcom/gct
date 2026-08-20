@@ -16,7 +16,8 @@ Each grouped base world is rendered into four coordinate conditions and a rename
 
 - explicit P;
 - P omitted but recoverable from `R = r0 + r1 ln(P)`;
-- P and every proxy absent, with pressure-shift pairs rendering byte-identical prompts;
+- P's value, name, and every proxy absent behind opaque symbol U (V after renaming), with
+  pressure-shift pairs rendering byte-identical prompts;
 - the inferable condition plus causally irrelevant, independently sampled Q;
 - all four repeated with familiar entity aliases, one-to-one renamed field symbols, and an explicit
   synthetic-law override.

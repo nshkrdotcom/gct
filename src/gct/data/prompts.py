@@ -98,21 +98,29 @@ class PromptRenderer:
         sensor_symbol = self.world.config.renamed_fields["sensor"] if renamed else "R"
         renamed_fields = self.world.config.renamed_fields
         renamed_legend = (
-            f"Renamed field legend: {renamed_fields['temperature']} is the requested scalar output; "
-            f"{renamed_fields['pressure']} is the control coordinate; "
-            f"{renamed_fields['concentration']} is the composition coordinate; "
-            f"{renamed_fields['sensor']} is the calibration proxy; "
-            f"{renamed_fields['nuisance']} is nuisance-only."
+            (
+                f"Renamed field legend: {renamed_fields['temperature']} is the requested scalar "
+                f"output; {renamed_fields['concentration']} is the composition coordinate; "
+                f"{renamed_fields['hidden']} is sealed and unobserved; "
+                f"{renamed_fields['nuisance']} is nuisance-only."
+                if coordinate_condition == "unobservable_coordinate"
+                else f"Renamed field legend: {renamed_fields['temperature']} is the requested "
+                f"scalar output; {renamed_fields['pressure']} is the control coordinate; "
+                f"{renamed_fields['concentration']} is the composition coordinate; "
+                f"{renamed_fields['sensor']} is the calibration proxy; "
+                f"{renamed_fields['nuisance']} is nuisance-only."
+            )
             if renamed
             else None
         )
         if coordinate_condition == "unobservable_coordinate":
+            sealed_symbol = self.world.config.renamed_fields["hidden"] if renamed else "U"
             manual = [
                 preface,
                 *([renamed_legend] if renamed_legend is not None else []),
-                f"The oracle also depends on a sealed coordinate {pressure_symbol} whose value "
+                f"The oracle also depends on a sealed coordinate {sealed_symbol} whose value "
                 "and proxies are withheld.",
-                *self._law_lines(renamed, hidden_symbol=pressure_symbol),
+                *self._law_lines(renamed, hidden_symbol=sealed_symbol),
             ]
         else:
             manual = [

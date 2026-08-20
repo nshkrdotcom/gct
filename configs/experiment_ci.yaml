@@ -29,7 +29,7 @@ world:
     Cyrene: {a: 58.0, b: 21.0, k: 0.35, q: 0.24}
   calibration_sensor: {r0: 40.0, r1: 7.0}
   familiar_aliases: {Aquila: Water, Boreal: Ethanol, Cyrene: Acetone}
-  renamed_fields: {temperature: Z, pressure: X, concentration: Y, sensor: G, fluid: Entity, nuisance: W}
+  renamed_fields: {temperature: Z, pressure: X, hidden: V, concentration: Y, sensor: G, fluid: Entity, nuisance: W}
 splits:
   train_base_worlds: 4
   validation_base_worlds: 2

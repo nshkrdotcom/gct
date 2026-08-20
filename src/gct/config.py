@@ -74,6 +74,7 @@ class WorldConfig(StrictModel):
         required_fields = {
             "temperature",
             "pressure",
+            "hidden",
             "concentration",
             "sensor",
             "fluid",

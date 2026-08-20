@@ -80,6 +80,19 @@ def test_unobservable_is_exactly_pressure_blind(ci_config: ExperimentConfig) -> 
     assert first.prompt_hash == second.prompt_hash
     assert "pressure" not in first.observable
     assert "sensor_reading" not in first.observable
+    assert "Pressure P" not in first.text
+    assert "sealed coordinate U" in first.text
+
+
+def test_renamed_unobservable_uses_opaque_isomorphic_hidden_symbol(
+    ci_config: ExperimentConfig,
+) -> None:
+    renderer = PromptRenderer(ToyThermo(ci_config.world))
+    state = State("Aquila", 1.1, 0.5, 0.8)
+    rendered = renderer.render(state, "unobservable_coordinate", renamed=True, variant="prose")
+    assert "sealed coordinate V" in rendered.text
+    assert "Control X" not in rendered.text
+    assert "ln(V)" in rendered.text
 
 
 def test_alias_world_changes_labels_not_oracle(ci_config: ExperimentConfig) -> None:
