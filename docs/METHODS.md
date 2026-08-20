@@ -70,3 +70,9 @@ permutation replicate refits coefficients and repeats validation dimension selec
 confidence intervals resample base worlds. Exploratory test layer p-values receive Benjamini-Hochberg
 FDR correction. Behavior-link regressions compare defect features against character/token length,
 activation norm, and oracle-delta controls.
+
+The descriptive MDL control is `normalized held-out whitened defect + lambda * complexity`, where
+complexity is the sum of an added-coordinate indicator and the fitted operator's effective parameter
+count divided by the maximum candidate effective-parameter count. The predeclared lambda values are
+0, 0.01, 0.03, 0.1, 0.3, and 1. The sweep is reported in full and never replaces the held-out
+prediction, irrelevant-coordinate, or unobservable-coordinate decision rules.
