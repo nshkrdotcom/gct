@@ -1,52 +1,66 @@
-# The Geometry of Conditional Truth (GCT)
+# Geometry of Conditional Truth
 
-## Canonical Theory
+GCT is a reproducible experiment testing whether real language-model residual states carry
+reusable transport laws across controlled context transformations. The oracle is an axiomatic
+synthetic world; latent coherence is never treated as truth.
 
-> **Truth is not what survives context. Truth is what survives the correct accounting of context.**
+The default target is unquantized `Qwen/Qwen3-4B` in BF16 on an NVIDIA RTX 5060 Ti 16 GB.
+Synthetic data are intentional experimental data. Reported activation results must come from the
+real checkpoint; the package contains no production fake backend.
 
-GCT models truth not as an invariant point in representation space, but through the **lawful relationship among locally valid assertions across changing contexts**. The fundamental object is a **fibred contextual structure with restriction, forward transport, base-change coherence, descent, grounding, and ontology refinement**.
+## Setup
 
-## Core Thesis
+Python 3.11+ and a Blackwell-capable NVIDIA driver are required for the default run. The lock uses
+the official PyTorch CUDA 13.0 wheel index.
 
-Rather than seeking a universal representation `z(H)` constant across contexts, GCT begins with `z_H(c)` — a locally meaningful representation of proposition `H` under context `c`. The central question becomes: *How should `z_H(c)` relate to `z_{g*H}(c')` under context morphism `g: c → c'`?*
-
-## Key Components
-
-- **Context as a Site** — Category of contexts with Grothendieck topology
-- **Fibred Semantic Structure** — Bifibration over the context category
-- **Contravariant Restriction** — Backward reindexing across contexts
-- **Covariant Forward Transport** — Predictive transport of semantic states
-- **Descent & Matching** — Sheaf-condition coherence of local assertions
-- **Base-Change Coherence** — Beck–Chevalley consistency
-- **Defect Hierarchy** — Transport, cycle, base-change, descent, and grounding defects
-- **Active Descent Engine** — Recursive epistemic refinement loop
-- **Ontology Discovery** — Constrained structural model selection via base-space lifting
-
-## Three Geometric Tiers
-
-| Tier | Structure | Domain |
-|------|-----------|--------|
-| I | General Context Category | Irreversible transformations, general transport |
-| II | Reversible Context Groupoids | Paraphrase, formatting, nuisance symmetries |
-| III | Smooth Contextual Strata | Continuous parameters, differential geometry |
-
-## Empirical Predictions
-
-1. Nuisance robustness — irrelevant transforms produce smaller defects
-2. Reusable transport — learned transformations generalize to held-out claims
-3. Composition — external composition ↔ latent transport composition
-4. Commutation — commuting transforms ↔ low commutator defect
-5. Structural defects predict behavioral failure
-6. Hidden context leaves structured residuals (with negative controls)
-7. Base lifting repairs held-out structure beyond baselines
-8. Semantic renaming preserves discovered structure
-
-## Research Program
-
-```
-measure → falsify → replicate → formalize further → architect
+```bash
+uv sync --extra dev
+uv run gct doctor
 ```
 
-## License
+`gct doctor` fails with actionable guidance when CUDA, BF16, or Blackwell support is incompatible;
+it never silently sends a full model run to CPU.
 
-See [LICENSE](LICENSE) for details.
+## Reproduce
+
+The engineering configuration exercises code paths and is not scientific validation:
+
+```bash
+uv run gct run --config configs/experiment_ci.yaml --resume
+```
+
+The preregistered experiment is:
+
+```bash
+uv run gct run --config configs/experiment_full.yaml --resume
+```
+
+Individual and audit commands follow the same immutable run resolution:
+
+```bash
+uv run gct dataset build --config configs/experiment_full.yaml
+uv run gct dataset validate --run runs/<run-id>
+uv run gct activations extract --config configs/experiment_full.yaml --resume
+uv run gct behavior evaluate --config configs/experiment_full.yaml --resume
+uv run gct transport fit --config configs/experiment_full.yaml
+uv run gct probes fit --config configs/experiment_full.yaml
+uv run gct metrics evaluate --config configs/experiment_full.yaml
+uv run gct stats run --config configs/experiment_full.yaml
+uv run gct report build --config configs/experiment_full.yaml
+uv run gct inspect run runs/<run-id>
+uv run gct inspect sample <sample-id>
+uv run gct verify runs/<run-id>
+```
+
+See [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md), [METHODS.md](docs/METHODS.md), and the
+machine-readable preregistration in the full config. Generated evidence is summarized in
+`REPORT.md`; limitations and incomplete hardware-dependent work are stated explicitly.
+
+## Quality gates
+
+```bash
+uv run pytest -q
+uv run ruff check .
+uv run ruff format --check .
+uv run mypy src/gct
+```

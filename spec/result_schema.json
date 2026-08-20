@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GCT hypothesis summary v1",
+  "type": "object",
+  "required": ["schema_version", "config_hash", "evaluation_split", "hypotheses"],
+  "properties": {
+    "schema_version": {"const": "gct-hypotheses-v1"},
+    "config_hash": {"type": "string"},
+    "evaluation_split": {"const": "held-out test"},
+    "hypotheses": {
+      "type": "object",
+      "required": ["H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8"]
+    }
+  }
+}

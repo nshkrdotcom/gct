@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GCT flattened dataset row v1",
+  "type": "object",
+  "required": [
+    "sample_id", "base_world_id", "split", "arm", "coordinate_condition",
+    "world_variant", "world_version", "fluid", "pressure", "concentration",
+    "observable_json", "oracle_target", "prompt", "prompt_hash", "renderer_variant",
+    "transform_id", "transform_family", "transform_name", "transform_parameters_json",
+    "oracle_identity", "composition_json", "char_count", "secondary_entity_holdout"
+  ],
+  "properties": {
+    "sample_id": {"type": "string"},
+    "base_world_id": {"type": "string"},
+    "split": {"enum": ["train", "validation", "test"]},
+    "arm": {"type": "string"},
+    "coordinate_condition": {"type": "string"},
+    "world_variant": {"enum": ["primary", "renamed"]},
+    "oracle_target": {"type": "number"},
+    "prompt_hash": {"type": "string"},
+    "source_sample_id": {"type": ["string", "null"]},
+    "square_id": {"type": ["string", "null"]},
+    "cycle_id": {"type": ["string", "null"]}
+  }
+}

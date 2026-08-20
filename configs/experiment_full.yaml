@@ -1,0 +1,150 @@
+project:
+  name: geometry-of-conditional-truth
+  protocol_version: gct-v0.1
+  seed: 20260819
+  run_root: runs
+
+model:
+  name: Qwen/Qwen3-4B
+  revision: null
+  dtype: bfloat16
+  device: cuda
+  quantization: none
+  trust_remote_code: false
+  chat_template: official
+  deterministic_decoding: true
+  max_new_tokens: 128
+
+hardware:
+  min_vram_gb: 14
+  allow_cpu_offload: false
+  dynamic_batching: true
+  initial_batch_size: 8
+
+world:
+  name: toythermo
+  version: toythermo-v1
+  pressure_range: [0.2, 3.0]
+  concentration_range: [0.0, 2.0]
+  fluids:
+    Aquila: {a: 95.0, b: 18.0, k: 0.55, q: 0.18}
+    Boreal: {a: 76.0, b: 13.0, k: 0.90, q: -0.12}
+    Cyrene: {a: 58.0, b: 21.0, k: 0.35, q: 0.24}
+  calibration_sensor: {r0: 40.0, r1: 7.0}
+  familiar_aliases: {Aquila: Water, Boreal: Ethanol, Cyrene: Acetone}
+
+splits:
+  train_base_worlds: 240
+  validation_base_worlds: 60
+  test_base_worlds: 120
+  group_key: base_world_id
+  holdout_renderer_family: json_like
+  holdout_fluid_on_secondary_test: Cyrene
+
+arms:
+  - explicit_coordinate
+  - inferable_unnamed_coordinate
+  - unobservable_coordinate
+  - irrelevant_coordinate
+  - semantic_renaming
+
+transforms:
+  nuisance:
+    paraphrase_variants: 3
+    formats: [prose, bullets, json_like, active_passive, clause_order, lexical_alias]
+    personas: [neutral, engineer, student]
+    include_irrelevant_fact: true
+  pressure_deltas:
+    train: [-0.40, -0.20, 0.20, 0.40]
+    validation: [-0.30, 0.30]
+    test: [-0.60, -0.10, 0.10, 0.60]
+  concentration_deltas:
+    train: [-0.40, -0.20, 0.20, 0.40]
+    validation: [-0.30, 0.30]
+    test: [-0.60, -0.10, 0.10, 0.60]
+  keep_transformed_states_in_domain: true
+
+activations:
+  token_position: final_common_anchor
+  layers: all
+  storage_dtype: float16
+  shard_size: 256
+  save_full_sequence: false
+  common_suffix_tokens: 4
+
+preprocessing:
+  pca_dims: [32, 64, 128, 256]
+  whitening: true
+  fit_split: train
+
+operators:
+  baselines: [identity, mean_shift, affine_ridge]
+  affine_ridge_alpha: 1.0
+  low_rank:
+    ranks: [4, 8, 16, 32]
+    ridge_alpha: 1.0
+    lr: 0.001
+    weight_decay: 0.0001
+    max_epochs: 500
+    early_stopping_patience: 30
+  generator:
+    enabled: true
+    reduced_dims: [32, 64, 128]
+    regularization: 0.001
+
+metrics:
+  distances: [cosine, standardized_l2, whitened_l2]
+  primary_distance: whitened_l2
+  behavior_tolerance_c: 0.5
+  normalize_transport_against: identity
+
+statistics:
+  bootstrap_replicates: 2000
+  permutation_replicates: 1000
+  fdr_alpha: 0.05
+  test_alpha: 0.05
+  group_key: base_world_id
+
+mdl:
+  lambda_values: [0.0, 0.01, 0.03, 0.1, 0.3, 1.0]
+
+reporting:
+  save_raw_tables: true
+  save_figures: true
+  include_all_preregistered_hypotheses: true
+  include_negative_results: true
+  scientific_claims_allowed: true
+
+preregistration:
+  H1:
+    title: Nuisance versus substantive separability
+    endpoint: Grouped-bootstrap difference in held-out normalized displacement at the validation-selected layer.
+    decision_rule: Supported only when the 95% CI for nuisance minus substantive displacement is below zero.
+  H2:
+    title: Reusable transport
+    endpoint: Held-out low-rank defect improvement over the strongest identity or mean-shift baseline.
+    decision_rule: Supported only when the grouped-bootstrap 95% CI for improvement is above zero.
+  H3:
+    title: Continuous composition
+    endpoint: Held-out generator prediction and pressure/concentration commuting-square defect on unseen magnitudes.
+    decision_rule: Supported only when generator prediction beats identity and commuting-route mismatch is smaller than mean route-to-target error.
+  H4:
+    title: Structural defects predict behavior
+    endpoint: Held-out behavioral-error prediction from defects versus token, length, norm, and oracle-delta confounds.
+    decision_rule: Supported only when defect features improve held-out prediction beyond confounds.
+  H5:
+    title: Inferable omitted coordinate in residuals
+    endpoint: Held-out pressure R2 and MAE from inferable-arm residuals with grouped permutation p-value.
+    decision_rule: Supported when R2 is positive and permutation p is at most 0.05.
+  H6:
+    title: Unobservable-coordinate negative control
+    endpoint: Held-out pressure recovery in identical-prompt unobservable pairs.
+    decision_rule: Passes when recovery does not exceed the 95th percentile of its permutation null.
+  H7:
+    title: Informative base lift
+    endpoint: Held-out structural and behavioral improvement for explicit P versus inferable omission and irrelevant Q.
+    decision_rule: Supported only when explicit P improves both endpoint families and Q gives no comparable gain.
+  H8:
+    title: Semantic-renaming robustness
+    endpoint: Repetition of H2, H5, and H7 signs and uncertainty under familiar-label aliases.
+    decision_rule: Supported only when the core directions survive without contamination-control failure.
