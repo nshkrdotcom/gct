@@ -45,11 +45,11 @@ def _hypothesis_line(name: str, record: dict[str, Any]) -> str:
             f"prediction-error gain={_fmt(grouped_gain['estimate'])} "
             f"[95% CI {_fmt(grouped_gain['ci_95'][0])}, {_fmt(grouped_gain['ci_95'][1])}]"
         )
-    if name == "H8" and all(key in record for key in ("H2", "H5", "H7")):
+    if name == "H8" and all(key in record for key in ("H2", "H5", "H6", "H7")):
         evidence.append(
             "renamed statuses="
             f"H2:{record['H2']['status']}, H5:{record['H5']['status']}, "
-            f"H7:{record['H7']['status']}"
+            f"H6:{record['H6']['status']}, H7:{record['H7']['status']}"
         )
     if not evidence:
         evidence.append(str(record.get("endpoint", "see machine-readable result")))

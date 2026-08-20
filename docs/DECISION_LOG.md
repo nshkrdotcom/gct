@@ -31,6 +31,9 @@
 - The same audit found that generator composition was unit-tested but not serialized as empirical
   output. Before resuming extraction, a held-out table was added for `T_(a+b)` versus `T_b T_a`,
   together with direct-route and composed-route errors to observed targets.
+- The semantic-replication audit then found that entity labels were renamed but field symbols were
+  not. Before any operator fitting or test statistic, the run was superseded with a versioned,
+  one-to-one `T/P/M/R/Q -> Z/X/Y/G/W` field map in addition to the familiar entity aliases.
 - Pin Python 3.12 because the available Python 3.14 free-threaded interpreter lacked binary wheels for
   critical tensor dependencies. The package source remains Python 3.11+ compatible.
 - Use PyTorch 2.12.0+cu130 following current Blackwell guidance and record the full lock hash.

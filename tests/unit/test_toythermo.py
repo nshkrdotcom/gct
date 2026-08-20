@@ -37,3 +37,9 @@ def test_irrelevant_q_has_no_causal_role(ci_config: ExperimentConfig) -> None:
     first = State("Boreal", 1.2, 0.4, 0.2)
     second = State("Boreal", 1.2, 0.4, 2.8)
     assert world.oracle(first) == world.oracle(second)
+
+
+def test_irrelevant_q_uses_matched_pressure_range(ci_config: ExperimentConfig) -> None:
+    world = ToyThermo(ci_config.world)
+    with pytest.raises(ValueError, match="irrelevant Q"):
+        world.validate(State("Aquila", 1.0, 0.5, 4.0))

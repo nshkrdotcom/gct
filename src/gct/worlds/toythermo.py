@@ -37,6 +37,10 @@ class ToyThermo:
             raise ValueError(f"pressure {state.pressure} outside [{p_min}, {p_max}]")
         if not m_min <= state.concentration <= m_max:
             raise ValueError(f"concentration {state.concentration} outside [{m_min}, {m_max}]")
+        if state.irrelevant_q is not None and not p_min <= state.irrelevant_q <= p_max:
+            raise ValueError(
+                f"irrelevant Q {state.irrelevant_q} outside matched range [{p_min}, {p_max}]"
+            )
 
     def oracle(self, state: State) -> float:
         self.validate(state)

@@ -265,14 +265,13 @@ def _base_lift(
         }
         behavior_pass = (
             explicit_behavior_result.lower > 0
-            and explicit_behavior_result.estimate > q_behavior_result.estimate
+            and explicit_behavior_result.lower > q_behavior_result.upper
         )
     else:
         behavior_payload = {"status": "inconclusive_due_to_parse_failures"}
         behavior_pass = False
     structural_pass = (
-        explicit_struct_result.lower > 0
-        and explicit_struct_result.estimate > q_struct_result.estimate
+        explicit_struct_result.lower > 0 and explicit_struct_result.lower > q_struct_result.upper
     )
     return (
         {
@@ -564,9 +563,10 @@ def run_statistics(config: ExperimentConfig, repo_root: Path) -> Path:
     h7["title"] = config.preregistration["H7"].title
     alias_h2, _ = _reusable_effect(transport, config, "renamed", 80)
     alias_h5_record = _probe_record(probe_manifest, "renamed", "inferable_unnamed_coordinate")
+    alias_h6_record = _probe_record(probe_manifest, "renamed", "unobservable_coordinate")
     alias_h7, _ = _base_lift(transport, behavior, config, "renamed", 90)
-    if alias_h5_record is None:
-        raise ValueError("renamed inferable probe is missing")
+    if alias_h5_record is None or alias_h6_record is None:
+        raise ValueError("renamed inferable or unobservable probe is missing")
     alias_h5_supported = (
         alias_h5_record["test_r2"] > 0
         and alias_h5_record["permutation_p_value"] <= config.statistics.test_alpha
@@ -575,10 +575,11 @@ def run_statistics(config: ExperimentConfig, repo_root: Path) -> Path:
         alias_h2["status"] == "supported"
         and alias_h5_supported
         and alias_h7["status"] == "supported"
+        and alias_h6_record["test_r2"] <= alias_h6_record["null_r2_95th_percentile"]
     )
     h8 = {
         "title": config.preregistration["H8"].title,
-        "endpoint": "renamed-world repetition of H2, H5, and H7",
+        "endpoint": "renamed-world repetition of H2, H5, H7, and the H6 contamination control",
         "H2": alias_h2,
         "H5": {
             "test_r2": alias_h5_record["test_r2"],
@@ -589,6 +590,18 @@ def run_statistics(config: ExperimentConfig, repo_root: Path) -> Path:
             "status": "supported" if alias_h5_supported else "not_supported",
         },
         "H7": alias_h7,
+        "H6": {
+            "test_r2": alias_h6_record["test_r2"],
+            "test_mae": alias_h6_record["test_mae"],
+            "test_r2_ci_95": alias_h6_record["test_r2_ci_95"],
+            "permutation_p_value": alias_h6_record["permutation_p_value"],
+            "null_r2_95th_percentile": alias_h6_record["null_r2_95th_percentile"],
+            "status": (
+                "control_pass"
+                if alias_h6_record["test_r2"] <= alias_h6_record["null_r2_95th_percentile"]
+                else "control_fail_investigate_leakage"
+            ),
+        },
         "status": "supported" if h8_supported else "not_supported",
     }
     if not config.reporting.scientific_claims_allowed:

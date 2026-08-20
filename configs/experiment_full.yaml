@@ -23,7 +23,7 @@ hardware:
 
 world:
   name: toythermo
-  version: toythermo-v1
+  version: toythermo-v1-fields-v1
   pressure_range: [0.2, 3.0]
   concentration_range: [0.0, 2.0]
   fluids:
@@ -32,6 +32,7 @@ world:
     Cyrene: {a: 58.0, b: 21.0, k: 0.35, q: 0.24}
   calibration_sensor: {r0: 40.0, r1: 7.0}
   familiar_aliases: {Aquila: Water, Boreal: Ethanol, Cyrene: Acetone}
+  renamed_fields: {temperature: Z, pressure: X, concentration: Y, sensor: G, fluid: Entity, nuisance: W}
 
 splits:
   train_base_worlds: 240
@@ -126,8 +127,8 @@ preregistration:
     decision_rule: Supported only when the grouped-bootstrap 95% CI for improvement is above zero.
   H3:
     title: Continuous composition
-    endpoint: Held-out generator prediction and pressure/concentration commuting-square defect on unseen magnitudes.
-    decision_rule: Supported only when generator prediction beats identity and commuting-route mismatch is smaller than mean route-to-target error.
+    endpoint: Held-out generator prediction, same-family composition proxy, and pressure/concentration commuting-square defect on unseen magnitudes.
+    decision_rule: Supported only when generator prediction beats identity and commuting-route mismatch is smaller than mean route-to-target error; same-family composition and route-to-target defects are always reported.
   H4:
     title: Structural defects predict behavior
     endpoint: Held-out behavioral-error prediction from defects versus token, length, norm, and oracle-delta confounds.
@@ -143,8 +144,8 @@ preregistration:
   H7:
     title: Informative base lift
     endpoint: Held-out structural and behavioral improvement for explicit P versus inferable omission and irrelevant Q.
-    decision_rule: Supported only when explicit P improves both endpoint families and Q gives no comparable gain.
+    decision_rule: Supported only when the explicit-P gain lower 95% confidence bound exceeds zero and the irrelevant-Q gain upper bound for both structural and behavioral endpoints.
   H8:
     title: Semantic-renaming robustness
     endpoint: Repetition of H2, H5, and H7 signs and uncertainty under familiar-label aliases.
-    decision_rule: Supported only when the core directions survive without contamination-control failure.
+    decision_rule: Supported only when renamed H2, H5, and H7 pass and the renamed identical-prompt unobservable control remains at or below its permutation-null 95th percentile.

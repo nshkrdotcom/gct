@@ -18,12 +18,14 @@ Each grouped base world is rendered into four coordinate conditions and a rename
 - P omitted but recoverable from `R = r0 + r1 ln(P)`;
 - P and every proxy absent, with pressure-shift pairs rendering byte-identical prompts;
 - the inferable condition plus causally irrelevant, independently sampled Q;
-- all four repeated with familiar-label aliases and an explicit synthetic-law override.
+- all four repeated with familiar entity aliases, one-to-one renamed field symbols, and an explicit
+  synthetic-law override.
 
 Every base world also has held-out nuisance renderings, pressure/concentration magnitudes, fluid swaps,
-nuisance cycles, and pressure/concentration commuting squares. Derived rows never cross the
-`base_world_id` split. Cyrene is absent from train/validation base states in the full protocol and is
-marked as a secondary test subset.
+nuisance cycles, and pressure/concentration commuting squares. Nuisance renderers distinctly cover
+paraphrase, active/passive phrasing, clause order, formatting, persona framing, irrelevant facts, and
+a reversible field-label alias map. Derived rows never cross the `base_world_id` split. Cyrene is
+absent from train/validation base states in the full protocol and is marked as a secondary test subset.
 
 ## Prompt anchor and model
 
@@ -34,9 +36,11 @@ configured final token suffix. `hidden_states[0]` is saved as the embedding outp
 `l` is explicitly read from `hidden_states[l+1]`.
 
 Only the final anchor vector is retained. Activation tensors are sharded safetensors with Parquet row
-indexes and SHA-256 hashes. Deterministic greedy answers are stored separately. An answer must end in
-`FINAL=<number>` or contain only a number; copied context numerals and missing markers are parse
-failures, not silently coerced.
+indexes and SHA-256 hashes. Deterministic greedy answers are stored separately. Generation prefills
+the fixed response prefix already requested by the prompt (`FINAL=`) and leaves the numeric
+continuation greedy and unconstrained. A complete `FINAL=<number>` line or an all-numeric response is
+parsed; copied context numerals, arithmetic expressions, and missing markers are failures rather than
+silently coerced answers. The manifest versions this response protocol.
 
 ## Frozen analysis
 

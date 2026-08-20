@@ -4,7 +4,12 @@ from collections.abc import Sequence
 from typing import Any
 
 from gct.config import ExperimentConfig
-from gct.data.prompts import COMMON_TASK_SUFFIX, PromptRenderer
+from gct.data.prompts import (
+    COMMON_TASK_SUFFIX,
+    LEXICAL_ALIAS_INVERSE,
+    LEXICAL_ALIAS_MAP,
+    PromptRenderer,
+)
 from gct.worlds.toythermo import State, ToyThermo
 
 
@@ -84,6 +89,9 @@ def test_alias_world_changes_labels_not_oracle(ci_config: ExperimentConfig) -> N
     primary = renderer.render(state, "explicit_coordinate", renamed=False, variant="prose")
     alias = renderer.render(state, "explicit_coordinate", renamed=True, variant="prose")
     assert "Aquila" in primary.text and "Water" in alias.text
+    assert "T(Aquila,P,M)" in primary.text and "Z(Water,X,Y)" in alias.text
+    assert "Pressure P" in primary.text and "Control X" in alias.text
+    assert "Calibration law: R" in primary.text and "Calibration law: G" in alias.text
     assert world.oracle(state) == world.oracle(state)
 
 
@@ -102,3 +110,6 @@ def test_required_nuisance_renderers_are_semantically_reversible(
         "Fluid:"
     )
     assert "Substance code: Boreal" in rendered["lexical_alias"].text
+    assert all(
+        LEXICAL_ALIAS_INVERSE[alias] == source for source, alias in LEXICAL_ALIAS_MAP.items()
+    )

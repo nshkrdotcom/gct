@@ -19,6 +19,21 @@ COMMON_TASK_SUFFIX = (
     "You may calculate internally, but end with a new line exactly in the form "
     "FINAL=<one decimal number>."
 )
+LEXICAL_ALIAS_MAP = {
+    "Fluid": "Substance code",
+    "Concentration M": "Mixture coordinate M",
+    "Pressure P": "Load coordinate P",
+    "Calibration reading R": "Gauge value R",
+    "Nuisance Q": "Auxiliary value Q",
+    "Entity": "Object code",
+    "Composition Y": "Mixture index Y",
+    "Control X": "Load index X",
+    "Proxy G": "Gauge alias G",
+    "Nuisance W": "Auxiliary value W",
+}
+LEXICAL_ALIAS_INVERSE = {value: key for key, value in LEXICAL_ALIAS_MAP.items()}
+if len(LEXICAL_ALIAS_INVERSE) != len(LEXICAL_ALIAS_MAP):  # pragma: no cover - import invariant
+    raise RuntimeError("lexical nuisance alias map must be one-to-one")
 
 
 class ChatTokenizer(Protocol):
@@ -49,11 +64,15 @@ class PromptRenderer:
 
     def _law_lines(self, renamed: bool, hidden_symbol: str = "P") -> list[str]:
         lines = []
+        temperature_symbol = self.world.config.renamed_fields["temperature"] if renamed else "T"
+        concentration_symbol = self.world.config.renamed_fields["concentration"] if renamed else "M"
         for fluid, c in sorted(self.world.config.fluids.items()):
             label = self.world.label(fluid, renamed)
             lines.append(
-                f"T({label},{hidden_symbol},M) = {c.a:.6g} + {c.b:.6g} ln({hidden_symbol}) "
-                f"+ {c.k:.6g} M + {c.q:.6g} M ln({hidden_symbol})"
+                f"{temperature_symbol}({label},{hidden_symbol},{concentration_symbol}) = "
+                f"{c.a:.6g} + {c.b:.6g} ln({hidden_symbol}) "
+                f"+ {c.k:.6g} {concentration_symbol} + {c.q:.6g} "
+                f"{concentration_symbol} ln({hidden_symbol})"
             )
         return lines
 
@@ -75,16 +94,37 @@ class PromptRenderer:
             "world_variant": "renamed" if renamed else "primary",
         }
         preface = "Synthetic-world rules override real-world chemistry."
+        pressure_symbol = self.world.config.renamed_fields["pressure"] if renamed else "P"
+        sensor_symbol = self.world.config.renamed_fields["sensor"] if renamed else "R"
+        renamed_fields = self.world.config.renamed_fields
+        renamed_legend = (
+            f"Renamed field legend: {renamed_fields['temperature']} is the requested scalar output; "
+            f"{renamed_fields['pressure']} is the control coordinate; "
+            f"{renamed_fields['concentration']} is the composition coordinate; "
+            f"{renamed_fields['sensor']} is the calibration proxy; "
+            f"{renamed_fields['nuisance']} is nuisance-only."
+            if renamed
+            else None
+        )
         if coordinate_condition == "unobservable_coordinate":
             manual = [
                 preface,
-                "The oracle also depends on a sealed coordinate U whose value and proxies are withheld.",
-                *self._law_lines(renamed, hidden_symbol="U"),
+                *([renamed_legend] if renamed_legend is not None else []),
+                f"The oracle also depends on a sealed coordinate {pressure_symbol} whose value "
+                "and proxies are withheld.",
+                *self._law_lines(renamed, hidden_symbol=pressure_symbol),
             ]
         else:
-            manual = [preface, *self._law_lines(renamed)]
+            manual = [
+                preface,
+                *([renamed_legend] if renamed_legend is not None else []),
+                *self._law_lines(renamed, hidden_symbol=pressure_symbol),
+            ]
             sensor = self.world.config.calibration_sensor
-            manual.append(f"Calibration law: R = {sensor.r0:.6g} + {sensor.r1:.6g} ln(P).")
+            manual.append(
+                f"Calibration law: {sensor_symbol} = {sensor.r0:.6g} + {sensor.r1:.6g} "
+                f"ln({pressure_symbol})."
+            )
             if coordinate_condition == "explicit_coordinate":
                 observable["pressure"] = state.pressure
             elif coordinate_condition in {"inferable_unnamed_coordinate", "irrelevant_coordinate"}:
@@ -93,14 +133,21 @@ class PromptRenderer:
                 raise ValueError(f"unknown coordinate condition: {coordinate_condition}")
             if coordinate_condition == "irrelevant_coordinate":
                 observable["irrelevant_q"] = state.irrelevant_q
-                manual.append("Q is an independently sampled nuisance and has no role in T or R.")
+                nuisance_symbol = self.world.config.renamed_fields["nuisance"] if renamed else "Q"
+                temperature_symbol = (
+                    self.world.config.renamed_fields["temperature"] if renamed else "T"
+                )
+                manual.append(
+                    f"{nuisance_symbol} is an independently sampled nuisance and has no role in "
+                    f"{temperature_symbol} or {sensor_symbol}."
+                )
 
         if renamed:
             manual.append(
                 "Familiar labels are aliases only; the supplied synthetic laws take precedence."
             )
 
-        context = self._render_context(observable, variant)
+        context = self._render_context(observable, variant, renamed=renamed)
         persona_line = {
             "neutral": "",
             "engineer": "Framing only: an engineer recorded this synthetic calibration.\n",
@@ -117,18 +164,35 @@ class PromptRenderer:
         text += COMMON_TASK_SUFFIX
         return RenderedPrompt(text, observable, hashlib.sha256(text.encode()).hexdigest())
 
-    @staticmethod
-    def _render_context(observable: dict[str, Any], variant: str) -> str:
+    def _render_context(self, observable: dict[str, Any], variant: str, *, renamed: bool) -> str:
+        aliases = self.world.config.renamed_fields
+        fields = (
+            {
+                "fluid": aliases["fluid"],
+                "concentration": f"Composition {aliases['concentration']}",
+                "pressure": f"Control {aliases['pressure']}",
+                "sensor": f"Proxy {aliases['sensor']}",
+                "nuisance": f"Nuisance {aliases['nuisance']}",
+            }
+            if renamed
+            else {
+                "fluid": "Fluid",
+                "concentration": "Concentration M",
+                "pressure": "Pressure P",
+                "sensor": "Calibration reading R",
+                "nuisance": "Nuisance Q",
+            }
+        )
         items = [
-            ("Fluid", str(observable["fluid"])),
-            ("Concentration M", _number(float(observable["concentration"]))),
+            (fields["fluid"], str(observable["fluid"])),
+            (fields["concentration"], _number(float(observable["concentration"]))),
         ]
         if "pressure" in observable:
-            items.append(("Pressure P", _number(float(observable["pressure"]))))
+            items.append((fields["pressure"], _number(float(observable["pressure"]))))
         if "sensor_reading" in observable:
-            items.append(("Calibration reading R", _number(float(observable["sensor_reading"]))))
+            items.append((fields["sensor"], _number(float(observable["sensor_reading"]))))
         if "irrelevant_q" in observable:
-            items.append(("Nuisance Q", _number(float(observable["irrelevant_q"]))))
+            items.append((fields["nuisance"], _number(float(observable["irrelevant_q"]))))
         if variant == "prose":
             return "; ".join(f"{key}: {value}" for key, value in items) + "."
         if variant == "bullets":
@@ -141,14 +205,13 @@ class PromptRenderer:
         if variant == "clause_order":
             return "; ".join(f"{key}: {value}" for key, value in reversed(items)) + "."
         if variant == "lexical_alias":
-            aliases = {
-                "Fluid": "Substance code",
-                "Concentration M": "Mixture coordinate M",
-                "Pressure P": "Load coordinate P",
-                "Calibration reading R": "Gauge value R",
-                "Nuisance Q": "Auxiliary value Q",
-            }
-            return "; ".join(f"{aliases[key]}: {value}" for key, value in items) + "."
+            return (
+                "; ".join(
+                    f"{LEXICAL_ALIAS_MAP.get(key, f'Alternate {key}')}: {value}"
+                    for key, value in items
+                )
+                + "."
+            )
         if variant.startswith("paraphrase_"):
             paraphrase_index = int(variant.rsplit("_", 1)[1])
             templates = (

@@ -61,6 +61,7 @@ class WorldConfig(StrictModel):
     fluids: dict[str, FluidCoefficients]
     calibration_sensor: SensorConfig = SensorConfig()
     familiar_aliases: dict[str, str]
+    renamed_fields: dict[str, str]
 
     @model_validator(mode="after")
     def validate_world(self) -> WorldConfig:
@@ -70,6 +71,18 @@ class WorldConfig(StrictModel):
             raise ValueError("concentration_range must be increasing")
         if len(self.fluids) != 3 or set(self.fluids) != set(self.familiar_aliases):
             raise ValueError("ToyThermo requires three fluids and one alias for each")
+        required_fields = {
+            "temperature",
+            "pressure",
+            "concentration",
+            "sensor",
+            "fluid",
+            "nuisance",
+        }
+        if set(self.renamed_fields) != required_fields:
+            raise ValueError(f"renamed_fields must define exactly {sorted(required_fields)}")
+        if len(set(self.renamed_fields.values())) != len(required_fields):
+            raise ValueError("renamed field aliases must be one-to-one")
         return self
 
 

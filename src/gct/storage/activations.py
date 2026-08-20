@@ -18,7 +18,7 @@ from gct.data.generate import validate_dataset_path
 from gct.data.prompts import PromptRenderer
 from gct.models.behavior import RESPONSE_PREFILL, generate_batch, parse_numeric_answer
 from gct.models.extract import extract_batch
-from gct.models.loader import load_model_and_tokenizer, resolve_model_revision
+from gct.models.loader import load_model_and_tokenizer, resolve_model_revision, runtime_report
 from gct.provenance import update_run_manifest
 from gct.storage.hashes import file_hash
 from gct.storage.manifests import artifact_record, read_json, write_json_atomic
@@ -147,6 +147,16 @@ def extract_activation_shards(
         "model_hidden_size": hidden_size,
         "configured_layers": config.activations.layers,
         "storage_dtype": config.activations.storage_dtype,
+        "extraction_settings": {
+            "output_hidden_states": True,
+            "use_cache": False,
+            "attention_implementation": "sdpa",
+            "save_full_sequence": False,
+            "token_position": config.activations.token_position,
+            "chat_template": config.model.chat_template,
+            "enable_thinking": False,
+        },
+        "runtime": runtime_report(config).to_dict(),
         "total_shards": total_shards,
         "shards": list(shard_records.values()),
     }

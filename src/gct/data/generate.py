@@ -26,6 +26,10 @@ def _stable_id(prefix: str, payload: Any) -> str:
     return f"{prefix}-{canonical_hash(payload)[:20]}"
 
 
+def _number_for_leakage_check(value: float) -> str:
+    return format(value, ".8f")
+
+
 def _safe_state(
     world: ToyThermo,
     rng: np.random.Generator,
@@ -453,6 +457,8 @@ def validate_dataset_frame(frame: pd.DataFrame, config: ExperimentConfig) -> dic
         source = cast(pd.Series, by_id.loc[str(row.source_sample_id)])
         if source["prompt_hash"] != row.prompt_hash or source["prompt"] != row.prompt:
             raise ValueError("unobservable prompt changed when only hidden pressure changed")
+        if _number_for_leakage_check(float(cast(Any, row.pressure))) in str(row.prompt):
+            raise ValueError("unobservable prompt contains the literal hidden pressure value")
         observable = json.loads(str(row.observable_json))
         if any(key in observable for key in ("pressure", "sensor_reading")):
             raise ValueError("unobservable prompt metadata leaks pressure or its proxy")
@@ -465,6 +471,42 @@ def validate_dataset_frame(frame: pd.DataFrame, config: ExperimentConfig) -> dic
         recovered = math.exp((float(observable["sensor_reading"]) - sensor.r0) / sensor.r1)
         if not math.isclose(recovered, float(cast(Any, row.pressure)), rel_tol=1e-7, abs_tol=1e-7):
             raise ValueError("inferable proxy does not deterministically encode pressure")
+    nuisance_rows = frame[frame["transform_name"] == "nuisance_rewrite"]
+    holdout_renderer = config.splits.holdout_renderer_family
+    if set(nuisance_rows[nuisance_rows["split"] == "test"]["renderer_variant"]) != {
+        holdout_renderer
+    }:
+        raise ValueError("test nuisance rows do not exclusively use the held-out renderer")
+    if (
+        nuisance_rows[nuisance_rows["split"].isin(["train", "validation"])]["renderer_variant"]
+        == holdout_renderer
+    ).any():
+        raise ValueError("held-out nuisance renderer leaked into train/validation")
+    holdout_fluid = config.splits.holdout_fluid_on_secondary_test
+    if holdout_fluid is not None:
+        if (frame[frame["split"].isin(["train", "validation"])]["fluid"] == holdout_fluid).any():
+            raise ValueError("secondary holdout fluid leaked into train/validation states")
+        secondary = frame[frame["secondary_entity_holdout"]]
+        enough_test_groups = config.splits.test_base_worlds >= len(config.world.fluids)
+        if enough_test_groups and (secondary.empty or set(secondary["split"]) != {"test"}):
+            raise ValueError("secondary entity subset is missing or is not test-only")
+    primary_keys = [
+        "base_world_id",
+        "coordinate_condition",
+        "transform_name",
+        "transform_parameters_json",
+    ]
+    primary = frame[frame["world_variant"] == "primary"].set_index(primary_keys)
+    renamed = frame[frame["world_variant"] == "renamed"].set_index(primary_keys)
+    if not primary.index.equals(renamed.index):
+        raise ValueError("semantic-renaming rows are not isomorphic to primary rows")
+    for column in ("pressure", "concentration", "oracle_target"):
+        if not np.allclose(
+            primary[column].to_numpy(dtype=float), renamed[column].to_numpy(dtype=float)
+        ):
+            raise ValueError(f"semantic renaming changed oracle-state column {column}")
+    if primary["fluid"].astype(str).tolist() != renamed["fluid"].astype(str).tolist():
+        raise ValueError("semantic renaming changed internal fluid identities")
     for prompt, digest in zip(frame["prompt"], frame["prompt_hash"], strict=True):
         actual = __import__("hashlib").sha256(str(prompt).encode()).hexdigest()
         if actual != digest:

@@ -15,8 +15,9 @@ dependency-lock hash, repository commit, model and tokenizer revision, seeds, da
 hashes, activation and behavior shard hashes, frozen selection, operator/probe artifacts, metrics,
 statistics, figures, and report.
 
-Resume accepts only artifacts with matching config, dataset, model revision, and content hashes.
-Completed valid activation shards are not recomputed. GPU kernels are deterministic to the extent
+Resume accepts only artifacts with matching config, dataset, model revision, upstream-manifest hash,
+and recursively checked content hashes. Completed valid activation shards are not recomputed. GPU
+kernels are deterministic to the extent
 supported by the pinned runtime, but cross-driver bitwise equality is not promised; semantic
 determinism and artifact hashes are recorded.
 
