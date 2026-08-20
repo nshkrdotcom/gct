@@ -12,8 +12,8 @@ This checklist is updated from actual artifacts during final review. “Implemen
 - [x] Residual pressure probes, grouped permutation nulls, base lift, Q, unobservable, and renaming.
 - [x] Grouped bootstrap, FDR, behavior confounds, MDL sweep, plots, and generated reports.
 - [x] CLI contract and one-command resolver.
-- [ ] Full preregistered real-model run verified.
-- [ ] Final report populated from the full run rather than development artifacts.
-- [ ] Final tests, lint, format, mypy, deterministic regeneration, and artifact verification recorded.
-- [ ] Final TODO/placeholder and test-contamination audit complete.
-- [ ] Logical commits and verified remote push complete.
+- [x] Full preregistered real-model run verified.
+- [x] Final report populated from the full run rather than development artifacts.
+- [x] Final tests, lint, format, mypy, deterministic regeneration, and artifact verification recorded.
+- [x] Final TODO/placeholder and test-contamination audit complete.
+- [x] Logical commits and verified remote push complete.

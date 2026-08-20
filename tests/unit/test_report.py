@@ -1,6 +1,6 @@
 from typing import Any
 
-from gct.reporting.report import _interpretation_level
+from gct.reporting.report import _interpretation_level, _root_report_text
 
 
 def _hypotheses() -> dict[str, dict[str, Any]]:
@@ -34,3 +34,12 @@ def test_interpretation_ladder_is_cumulative() -> None:
     for name in ("H5", "H7", "H8"):
         hypotheses[name]["status"] = "supported"
     assert _interpretation_level(hypotheses) == 5
+
+
+def test_root_report_links_resolve_into_the_run_directory() -> None:
+    text = "[plot](figures/test.png) `metrics/a.parquet` `statistics/b.json`"
+    assert _root_report_text(text, "gct-v0.1-example") == (
+        "[plot](runs/gct-v0.1-example/figures/test.png) "
+        "`runs/gct-v0.1-example/metrics/a.parquet` "
+        "`runs/gct-v0.1-example/statistics/b.json`"
+    )

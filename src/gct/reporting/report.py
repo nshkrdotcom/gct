@@ -98,6 +98,15 @@ def _interpretation_level(hypotheses: dict[str, dict[str, Any]]) -> int:
     return 5 if level_five else 4
 
 
+def _root_report_text(report_text: str, run_id: str) -> str:
+    run_prefix = f"runs/{run_id}/"
+    return (
+        report_text.replace("(figures/", f"({run_prefix}figures/")
+        .replace("`metrics/", f"`{run_prefix}metrics/")
+        .replace("`statistics/", f"`{run_prefix}statistics/")
+    )
+
+
 def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
     run_dir = config.run_dir(repo_root)
     statistics = read_json(run_dir / "statistics" / "hypotheses.json")
@@ -344,7 +353,9 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
     report_text = "\n".join(lines)
     report_path = run_dir / "REPORT.md"
     report_path.write_text(report_text, encoding="utf-8")
-    (repo_root / "REPORT.md").write_text(report_text, encoding="utf-8")
+    (repo_root / "REPORT.md").write_text(
+        _root_report_text(report_text, config.run_id), encoding="utf-8"
+    )
     manifest = {
         "schema_version": "gct-report-v1",
         "status": "complete",
