@@ -8,6 +8,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+import torch
 
 from gct.analysis.bootstrap import grouped_bootstrap_statistic
 from gct.analysis.pairs import load_layer_dataset, paired_data
@@ -54,6 +55,10 @@ def regression_metrics(labels: np.ndarray, predictions: np.ndarray) -> tuple[flo
     )
     mae = float(np.mean(np.abs(y - pred)))
     return r2, mae
+
+
+def _contiguous_float_tensor(values: np.ndarray) -> torch.Tensor:
+    return torch.from_numpy(np.ascontiguousarray(values, dtype=np.float32))
 
 
 def _slice_pca(pca: PCASpace, dimension: int) -> PCASpace:
@@ -223,20 +228,15 @@ def fit_hidden_coordinate_probes(config: ExperimentConfig, repo_root: Path) -> P
         path = output_dir / group_slug(group) / "pressure_probe.safetensors"
         if selected_probe.coefficient is None or selected_probe.intercept is None:
             raise RuntimeError("selected residual probe is not fitted")
-        import torch
         from safetensors.torch import save_file
 
         path.parent.mkdir(parents=True, exist_ok=True)
         save_file(
             {
-                "pca_mean": torch.from_numpy(selected_probe.pca.mean.astype(np.float32)),
-                "pca_components": torch.from_numpy(
-                    selected_probe.pca.components.astype(np.float32)
-                ),
-                "pca_variance": torch.from_numpy(
-                    selected_probe.pca.explained_variance.astype(np.float32)
-                ),
-                "coefficient": torch.from_numpy(selected_probe.coefficient.astype(np.float32)),
+                "pca_mean": _contiguous_float_tensor(selected_probe.pca.mean),
+                "pca_components": _contiguous_float_tensor(selected_probe.pca.components),
+                "pca_variance": _contiguous_float_tensor(selected_probe.pca.explained_variance),
+                "coefficient": _contiguous_float_tensor(selected_probe.coefficient),
                 "intercept": torch.tensor([selected_probe.intercept], dtype=torch.float32),
             },
             path,
