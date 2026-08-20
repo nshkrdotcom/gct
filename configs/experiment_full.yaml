@@ -13,6 +13,7 @@ model:
   trust_remote_code: false
   chat_template: official
   deterministic_decoding: true
+  duplicate_prompt_policy: canonical_first_occurrence
   max_new_tokens: 128
 
 hardware:
@@ -72,6 +73,7 @@ activations:
   shard_size: 256
   save_full_sequence: false
   common_suffix_tokens: 4
+  duplicate_prompt_policy: canonical_first_occurrence
 
 preprocessing:
   pca_dims: [32, 64, 128, 256]

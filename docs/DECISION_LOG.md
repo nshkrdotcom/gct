@@ -37,6 +37,11 @@
 - The scientific-QC checklist additionally required the unobservable arm to omit the pressure field
   name, not only its value and proxy. Its sealed field is therefore opaque `U` in the primary world
   and isomorphically renamed `V`; neither `P` nor `X` appears in its state description or law.
+- Final leakage QC found three byte-identical unobservable pairs with different stored states when the
+  rows crossed BF16/SDPA shard batches, even though the probe control passed. The affected run was
+  superseded. A config-hashed `canonical_first_occurrence` policy now makes activations and greedy
+  responses exact functions of prompt hash across shards before any operator fit, records raw mismatch
+  counts, and recomputes row-specific behavioral errors after response canonicalization.
 - Pin Python 3.12 because the available Python 3.14 free-threaded interpreter lacked binary wheels for
   critical tensor dependencies. The package source remains Python 3.11+ compatible.
 - Use PyTorch 2.12.0+cu130 following current Blackwell guidance and record the full lock hash.

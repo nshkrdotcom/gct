@@ -31,6 +31,7 @@ class ModelConfig(StrictModel):
     trust_remote_code: bool = False
     chat_template: Literal["official"] = "official"
     deterministic_decoding: bool = True
+    duplicate_prompt_policy: Literal["canonical_first_occurrence"] = "canonical_first_occurrence"
     max_new_tokens: int = Field(default=32, ge=1, le=512)
 
 
@@ -131,6 +132,7 @@ class ActivationConfig(StrictModel):
     shard_size: int = Field(default=256, ge=1)
     save_full_sequence: bool = False
     common_suffix_tokens: int = Field(default=4, ge=1)
+    duplicate_prompt_policy: Literal["canonical_first_occurrence"] = "canonical_first_occurrence"
 
 
 class PreprocessingConfig(StrictModel):

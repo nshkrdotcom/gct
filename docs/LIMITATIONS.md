@@ -18,6 +18,9 @@
   worlds. It preserves controls but has materially lower power, especially for behavior and Cyrene.
 - Identical prompts force identical deterministic activations in the unobservable control. Passing this
   negative control is necessary but cannot exclude every leakage route elsewhere.
+- The canonical-first duplicate policy deliberately removes rare batch-dependent BF16/SDPA variation.
+  It protects identifiability controls but treats such numerical sensitivity as instrumentation noise;
+  a separate systems study could analyze that sensitivity rather than erase it.
 - Observational correlation between latent defects and errors does not establish causal relevance.
 - No result equates latent coherence with oracle truth or establishes a sheaf, bifibration, ontology,
   consciousness, or universal truth manifold.

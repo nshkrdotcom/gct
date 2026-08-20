@@ -7,12 +7,12 @@ import json
 import math
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import pandas as pd
 import torch
 from safetensors import safe_open
-from safetensors.torch import save_file
+from safetensors.torch import load_file, save_file
 
 from gct.config import ExperimentConfig
 from gct.data.generate import validate_dataset_path
@@ -86,6 +86,73 @@ def _valid_shard(record: dict[str, Any], run_dir: Path) -> bool:
     )
 
 
+def _canonicalize_activation_duplicates(
+    frame: pd.DataFrame, manifest: dict[str, Any], run_dir: Path
+) -> dict[str, Any]:
+    """Make identical prompt hashes bitwise identical across shard/batch boundaries."""
+    duplicate_hashes = set(
+        frame.loc[frame["prompt_hash"].duplicated(keep=False), "prompt_hash"].astype(str)
+    )
+    canonical: dict[str, tuple[torch.Tensor, torch.Tensor]] = {}
+    compared_rows = 0
+    mismatched_rows = 0
+    rewritten_shards = 0
+    max_abs_difference = 0.0
+    records = sorted(manifest["shards"], key=lambda item: int(item["shard_number"]))
+    for record in records:
+        path = run_dir / str(record["path"])
+        with safe_open(path, framework="pt", device="cpu") as handle:
+            metadata = handle.metadata() or {}
+        tensors = load_file(path, device="cpu")
+        activations = tensors["activations"]
+        embeddings = tensors["embeddings"]
+        start = int(record["start"])
+        rows = int(record["rows"])
+        shard_hashes = frame.iloc[start : start + rows]["prompt_hash"].astype(str).tolist()
+        changed = False
+        for offset, prompt_hash in enumerate(shard_hashes):
+            if prompt_hash not in duplicate_hashes:
+                continue
+            current = (activations[offset], embeddings[offset])
+            if prompt_hash not in canonical:
+                canonical[prompt_hash] = (current[0].clone(), current[1].clone())
+                continue
+            compared_rows += 1
+            canonical_activation, canonical_embedding = canonical[prompt_hash]
+            activation_equal = torch.equal(current[0], canonical_activation)
+            embedding_equal = torch.equal(current[1], canonical_embedding)
+            if activation_equal and embedding_equal:
+                continue
+            mismatched_rows += 1
+            max_abs_difference = max(
+                max_abs_difference,
+                float((current[0].float() - canonical_activation.float()).abs().max()),
+                float((current[1].float() - canonical_embedding.float()).abs().max()),
+            )
+            activations[offset].copy_(canonical_activation)
+            embeddings[offset].copy_(canonical_embedding)
+            changed = True
+        if changed:
+            save_file(
+                {"activations": activations.contiguous(), "embeddings": embeddings.contiguous()},
+                path,
+                metadata=metadata,
+            )
+            record["sha256"] = file_hash(path)
+            record["bytes"] = path.stat().st_size
+            rewritten_shards += 1
+    manifest["shards"] = records
+    return {
+        "status": "complete",
+        "policy": "canonical_first_occurrence",
+        "duplicate_prompt_hashes": len(duplicate_hashes),
+        "compared_duplicate_rows": compared_rows,
+        "mismatched_rows_before_canonicalization": mismatched_rows,
+        "rewritten_shards": rewritten_shards,
+        "max_abs_difference_before_canonicalization": max_abs_difference,
+    }
+
+
 def extract_activation_shards(
     config: ExperimentConfig, repo_root: Path, *, resume: bool = False
 ) -> Path:
@@ -108,6 +175,17 @@ def extract_activation_shards(
             _valid_shard(record, run_dir) for record in existing.get("shards", [])
         ):
             if resume:
+                canonicalization = existing.get("duplicate_prompt_canonicalization", {})
+                if canonicalization.get("status") != "complete":
+                    existing["duplicate_prompt_canonicalization"] = (
+                        _canonicalize_activation_duplicates(frame, existing, run_dir)
+                    )
+                    write_json_atomic(manifest_path, existing)
+                    update_run_manifest(
+                        run_dir,
+                        activation_manifest_hash=file_hash(manifest_path),
+                        status="activations_complete",
+                    )
                 return run_dir
             raise FileExistsError("valid activation artifacts already exist; pass --resume")
         revision = str(existing["model_revision"])
@@ -156,6 +234,7 @@ def extract_activation_shards(
             "token_position": config.activations.token_position,
             "chat_template": config.model.chat_template,
             "enable_thinking": False,
+            "duplicate_prompt_policy": config.activations.duplicate_prompt_policy,
         },
         "runtime": runtime_report(config).to_dict(),
         "total_shards": total_shards,
@@ -234,6 +313,10 @@ def extract_activation_shards(
         raise RuntimeError("activation index order differs from dataset order")
     full_index_path = output_dir / "index.parquet"
     full_index.to_parquet(full_index_path, index=False, compression="zstd")
+    base_manifest["shards"] = [shard_records[key] for key in sorted(shard_records)]
+    base_manifest["duplicate_prompt_canonicalization"] = _canonicalize_activation_duplicates(
+        frame, base_manifest, run_dir
+    )
     base_manifest.update(
         {
             "status": "complete",
@@ -274,6 +357,85 @@ def load_activation_layer(run_dir: Path, layer_number: int) -> tuple[pd.DataFram
     return index, values
 
 
+def _canonicalize_behavior_duplicates(
+    frame: pd.DataFrame,
+    records: dict[int, dict[str, Any]],
+    run_dir: Path,
+    tolerance: float,
+) -> dict[str, Any]:
+    """Make greedy responses a deterministic function of prompt hash across shards."""
+    duplicate_hashes = set(
+        frame.loc[frame["prompt_hash"].duplicated(keep=False), "prompt_hash"].astype(str)
+    )
+    canonical: dict[str, str] = {}
+    compared_rows = 0
+    mismatched_rows = 0
+    rewritten_shards = 0
+    for shard_number in sorted(records):
+        record = records[shard_number]
+        path = run_dir / str(record["path"])
+        results = pd.read_parquet(path)
+        start = int(record["start"])
+        shard_frame = frame.iloc[start : start + len(results)].reset_index(drop=True)
+        changed = False
+        for offset, prompt_hash in enumerate(shard_frame["prompt_hash"].astype(str)):
+            if prompt_hash not in duplicate_hashes:
+                continue
+            raw_output = str(results.at[offset, "raw_output"])
+            if prompt_hash not in canonical:
+                canonical[prompt_hash] = raw_output
+            else:
+                compared_rows += 1
+                if raw_output != canonical[prompt_hash]:
+                    mismatched_rows += 1
+                    raw_output = canonical[prompt_hash]
+                    results.at[offset, "raw_output"] = raw_output
+                    changed = True
+            parsed = parse_numeric_answer(raw_output)
+            oracle = float(cast(Any, shard_frame.at[offset, "oracle_target"]))
+            error = abs(float(parsed.value) - oracle) if parsed.value is not None else None
+            expected = {
+                "parse_status": parsed.status,
+                "parsed_answer": parsed.value,
+                "absolute_error": error,
+                "within_tolerance": error is not None and error <= tolerance,
+            }
+            for column, value in expected.items():
+                current = results.at[offset, column]
+                equal = (pd.isna(current) and value is None) or current == value
+                if not equal:
+                    results.at[offset, column] = value
+                    changed = True
+        if changed:
+            results.to_parquet(path, index=False, compression="zstd")
+            record["sha256"] = file_hash(path)
+            record["bytes"] = path.stat().st_size
+            rewritten_shards += 1
+    return {
+        "status": "complete",
+        "policy": "canonical_first_occurrence",
+        "duplicate_prompt_hashes": len(duplicate_hashes),
+        "compared_duplicate_rows": compared_rows,
+        "mismatched_rows_before_canonicalization": mismatched_rows,
+        "rewritten_shards": rewritten_shards,
+    }
+
+
+def _consolidate_behavior_results(
+    frame: pd.DataFrame,
+    records: dict[int, dict[str, Any]],
+    total_shards: int,
+    run_dir: Path,
+) -> tuple[Path, pd.DataFrame]:
+    all_results = [pd.read_parquet(run_dir / str(records[i]["path"])) for i in range(total_shards)]
+    result_frame = pd.concat(all_results, ignore_index=True)
+    if result_frame["sample_id"].tolist() != frame["sample_id"].astype(str).tolist():
+        raise RuntimeError("behavior result order differs from dataset order")
+    result_path = run_dir / "behavior" / "results.parquet"
+    result_frame.to_parquet(result_path, index=False, compression="zstd")
+    return result_path, result_frame
+
+
 def evaluate_behavior_shards(
     config: ExperimentConfig, repo_root: Path, *, resume: bool = False
 ) -> Path:
@@ -298,6 +460,31 @@ def evaluate_behavior_shards(
             for item in records.values()
         ):
             if resume:
+                canonicalization = existing.get("duplicate_prompt_canonicalization", {})
+                if canonicalization.get("status") != "complete":
+                    total_shards = int(existing["total_shards"])
+                    existing["duplicate_prompt_canonicalization"] = (
+                        _canonicalize_behavior_duplicates(
+                            frame,
+                            records,
+                            run_dir,
+                            config.metrics.behavior_tolerance_c,
+                        )
+                    )
+                    result_path, result_frame = _consolidate_behavior_results(
+                        frame, records, total_shards, run_dir
+                    )
+                    existing["shards"] = [records[key] for key in sorted(records)]
+                    existing["results"] = artifact_record(result_path, run_dir, "behavior_results")
+                    existing["parse_failure_count"] = int(
+                        (result_frame["parse_status"] != "parsed").sum()
+                    )
+                    write_json_atomic(manifest_path, existing)
+                    update_run_manifest(
+                        run_dir,
+                        behavior_manifest_hash=file_hash(manifest_path),
+                        status="behavior_complete",
+                    )
                 return run_dir
             raise FileExistsError("valid behavior artifacts already exist; pass --resume")
     else:
@@ -324,6 +511,7 @@ def evaluate_behavior_shards(
             "max_new_tokens": config.model.max_new_tokens,
             "response_prefill": RESPONSE_PREFILL,
             "protocol": "deterministic-greedy-prefill-v1",
+            "duplicate_prompt_policy": config.model.duplicate_prompt_policy,
         },
         "total_shards": total_shards,
         "shards": list(records.values()),
@@ -384,18 +572,17 @@ def evaluate_behavior_shards(
         records[shard_number] = record
         manifest["shards"] = [records[key] for key in sorted(records)]
         write_json_atomic(manifest_path, manifest)
-    all_results = [pd.read_parquet(run_dir / str(records[i]["path"])) for i in range(total_shards)]
-    result_frame = pd.concat(all_results, ignore_index=True)
-    if result_frame["sample_id"].tolist() != frame["sample_id"].astype(str).tolist():
-        raise RuntimeError("behavior result order differs from dataset order")
-    result_path = output_dir / "results.parquet"
-    result_frame.to_parquet(result_path, index=False, compression="zstd")
+    canonicalization = _canonicalize_behavior_duplicates(
+        frame, records, run_dir, config.metrics.behavior_tolerance_c
+    )
+    result_path, result_frame = _consolidate_behavior_results(frame, records, total_shards, run_dir)
     manifest.update(
         {
             "status": "complete",
             "results": artifact_record(result_path, run_dir, "behavior_results"),
             "shards": [records[key] for key in sorted(records)],
             "parse_failure_count": int((result_frame["parse_status"] != "parsed").sum()),
+            "duplicate_prompt_canonicalization": canonicalization,
         }
     )
     write_json_atomic(manifest_path, manifest)

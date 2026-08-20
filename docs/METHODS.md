@@ -43,6 +43,11 @@ continuation greedy and unconstrained. A complete `FINAL=<number>` line or an al
 parsed; copied context numerals, arithmetic expressions, and missing markers are failures rather than
 silently coerced answers. The manifest versions this response protocol.
 
+Identical prompt hashes are canonicalized to their first dataset occurrence after shard extraction and
+generation. This removes rare BF16/SDPA batch-boundary variation as a hidden-label pathway. Manifests
+record how many raw mismatches were found and which shards were rewritten; per-row oracle errors are
+recomputed after response canonicalization.
+
 ## Frozen analysis
 
 PCA, standardization, whitening, operators, and probes fit training rows only. Layer, PCA dimension,
