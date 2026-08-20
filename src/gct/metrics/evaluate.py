@@ -339,6 +339,11 @@ def evaluate_metrics(config: ExperimentConfig, repo_root: Path) -> Path:
         or behavior_manifest.get("status") != "complete"
     ):
         raise ValueError("operators and behavior must be complete before metric evaluation")
+    if (
+        operator_manifest.get("config_hash") != config.config_hash
+        or behavior_manifest.get("config_hash") != config.config_hash
+    ):
+        raise ValueError("operator/behavior config differs from metric config")
     selection = read_json(run_dir / "operators" / "selection_frozen.json")
     if selection.get("test_data_used") is not False:
         raise ValueError("frozen selection does not certify validation-only selection")
@@ -368,6 +373,8 @@ def evaluate_metrics(config: ExperimentConfig, repo_root: Path) -> Path:
         "status": "complete",
         "config_hash": config.config_hash,
         "selection_freeze_hash": selection["freeze_hash"],
+        "operator_manifest_hash": file_hash(run_dir / "operators" / "manifest.json"),
+        "behavior_manifest_hash": file_hash(run_dir / "behavior" / "manifest.json"),
         "primary_layer": layer,
         "test_evaluated_after_freeze": True,
         "tables": artifacts,

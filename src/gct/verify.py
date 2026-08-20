@@ -7,6 +7,7 @@ from typing import Any
 
 from gct.config import load_config
 from gct.data.generate import validate_dataset_path
+from gct.pipeline import _complete
 from gct.storage.hashes import file_hash
 from gct.storage.manifests import read_json, verify_artifact
 
@@ -49,6 +50,10 @@ def verify_run(run_dir: Path) -> dict[str, Any]:
             errors.append(f"{stage} status is not complete")
         if stage_manifest.get("config_hash") != config.config_hash:
             errors.append(f"{stage} config hash mismatch")
+        if stage in {"operators", "probes", "metrics", "statistics", "report"} and not _complete(
+            stage, path, config, run_dir
+        ):
+            errors.append(f"{stage} dependency or artifact hash verification failed")
         for value in stage_manifest.values():
             if isinstance(value, dict):
                 _verify_record(value, run_dir, errors)
@@ -58,6 +63,8 @@ def verify_run(run_dir: Path) -> dict[str, Any]:
                         _verify_record(item, run_dir, errors)
     if "activations" in manifests:
         activation = manifests["activations"]
+        if len(activation.get("shards", [])) != activation.get("total_shards"):
+            errors.append("activation shard count differs from manifest total")
         for shard in activation.get("shards", []):
             path = run_dir / str(shard["path"])
             index_path = run_dir / str(shard["index_path"])
@@ -70,6 +77,10 @@ def verify_run(run_dir: Path) -> dict[str, Any]:
         if recorded is not None and resolved != recorded:
             errors.append("model revision differs between run and activation manifests")
     if "behavior" in manifests:
+        if len(manifests["behavior"].get("shards", [])) != manifests["behavior"].get(
+            "total_shards"
+        ):
+            errors.append("behavior shard count differs from manifest total")
         for shard in manifests["behavior"].get("shards", []):
             path = run_dir / str(shard["path"])
             if not path.is_file() or file_hash(path) != shard.get("sha256"):

@@ -107,6 +107,8 @@ def fit_transport_operators(config: ExperimentConfig, repo_root: Path) -> Path:
     activation_manifest = read_json(run_dir / "activations" / "manifest.json")
     if activation_manifest.get("status") != "complete":
         raise ValueError("complete activation artifacts are required")
+    if activation_manifest.get("config_hash") != config.config_hash:
+        raise ValueError("activation manifest config differs from operator config")
     output_dir = run_dir / "operators"
     output_dir.mkdir(parents=True, exist_ok=True)
     scan = _candidate_scan(config, run_dir)
@@ -257,6 +259,7 @@ def fit_transport_operators(config: ExperimentConfig, repo_root: Path) -> Path:
         "status": "complete",
         "config_hash": config.config_hash,
         "model_revision": activation_manifest["model_revision"],
+        "activation_manifest_hash": file_hash(run_dir / "activations" / "manifest.json"),
         "selection": selection_payload,
         "selection_artifact": artifact_record(selection_path, run_dir, "frozen_selection"),
         "validation_scan": artifact_record(scan_path, run_dir, "validation_selection"),

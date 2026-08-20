@@ -236,6 +236,7 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         "status": "complete",
         "config_hash": config.config_hash,
         "interpretation_level": level,
+        "statistics_manifest_hash": file_hash(run_dir / "statistics" / "manifest.json"),
         "report": artifact_record(report_path, run_dir, "markdown_report"),
         "figures": figures,
     }

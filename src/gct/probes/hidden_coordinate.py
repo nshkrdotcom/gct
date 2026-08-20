@@ -85,6 +85,11 @@ def _residual_split(
 def fit_hidden_coordinate_probes(config: ExperimentConfig, repo_root: Path) -> Path:
     run_dir = config.run_dir(repo_root)
     operator_manifest = read_json(run_dir / "operators" / "manifest.json")
+    if (
+        operator_manifest.get("status") != "complete"
+        or operator_manifest.get("config_hash") != config.config_hash
+    ):
+        raise ValueError("complete same-config operator artifacts are required")
     selection = read_json(run_dir / "operators" / "selection_frozen.json")
     layer = int(selection["primary_layer"])
     frame, values = load_layer_dataset(run_dir, layer)
@@ -276,6 +281,7 @@ def fit_hidden_coordinate_probes(config: ExperimentConfig, repo_root: Path) -> P
         "config_hash": config.config_hash,
         "primary_layer": layer,
         "selection_freeze_hash": selection["freeze_hash"],
+        "operator_manifest_hash": file_hash(run_dir / "operators" / "manifest.json"),
         "probe_alpha": alpha,
         "permutation_replicates": config.statistics.permutation_replicates,
         "probes": probe_records,

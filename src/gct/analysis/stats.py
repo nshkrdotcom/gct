@@ -477,6 +477,11 @@ def run_statistics(config: ExperimentConfig, repo_root: Path) -> Path:
     operator_manifest = read_json(run_dir / "operators" / "manifest.json")
     if metrics_manifest.get("status") != "complete" or probe_manifest.get("status") != "complete":
         raise ValueError("metrics and probes must be complete before statistics")
+    if (
+        metrics_manifest.get("config_hash") != config.config_hash
+        or probe_manifest.get("config_hash") != config.config_hash
+    ):
+        raise ValueError("metric/probe config differs from statistics config")
     transport = pd.read_parquet(run_dir / "metrics" / "transport_edges.parquet")
     squares = pd.read_parquet(run_dir / "metrics" / "squares.parquet")
     composition = pd.read_parquet(run_dir / "metrics" / "generator_composition.parquet")
@@ -627,6 +632,9 @@ def run_statistics(config: ExperimentConfig, repo_root: Path) -> Path:
         "config_hash": config.config_hash,
         "bootstrap_replicates": config.statistics.bootstrap_replicates,
         "permutation_replicates": config.statistics.permutation_replicates,
+        "metrics_manifest_hash": file_hash(run_dir / "metrics" / "manifest.json"),
+        "probe_manifest_hash": file_hash(run_dir / "probes" / "manifest.json"),
+        "operator_manifest_hash": file_hash(run_dir / "operators" / "manifest.json"),
         "hypotheses": artifact_record(summary_path, run_dir, "hypothesis_summary"),
         "tables": artifacts,
     }
