@@ -31,5 +31,5 @@ This checklist is updated from actual artifacts during final review. “Implemen
 - [x] All H1–H8 endpoints and controls evaluated; H6 mandatory and passing in primary/renamed worlds.
 - [x] Stable-ID/base-world paired cross-model analysis, seven required figures, and schema-validated JSON.
 - [x] Actual-evidence `REPORT_MODEL2.md` and `REPORT_CROSS_MODEL.md` generated.
-- [ ] Final Model #2 tests/lint/format/typecheck/real integration/hash/regeneration gates recorded.
-- [ ] Model #2 implementation/reports committed, pushed, remote-verified, and worktree clean.
+- [x] Final Model #2 tests/lint/format/typecheck/real integration/hash/regeneration gates recorded.
+- [x] Model #2 implementation/reports committed, pushed, remote-verified, and worktree clean.
