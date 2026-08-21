@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "GCT Model2 Cross-Model Summary",
+  "type": "object",
+  "required": [
+    "baseline_run",
+    "replication_run",
+    "baseline_model",
+    "replication_model",
+    "endpoint_comparisons",
+    "interpretation"
+  ],
+  "properties": {
+    "baseline_run": {"type": "string"},
+    "replication_run": {"type": "string"},
+    "baseline_model": {"type": "string"},
+    "replication_model": {"type": "string"},
+    "dataset_logical_hash": {"type": "string"},
+    "endpoint_comparisons": {
+      "type": "array",
+      "minItems": 8,
+      "items": {
+        "type": "object",
+        "required": ["hypothesis", "baseline_status", "replication_status"],
+        "properties": {
+          "hypothesis": {"enum": ["H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8"]},
+          "baseline_status": {"type": "string"},
+          "replication_status": {"type": "string"},
+          "baseline_effect": {"type": ["number", "null"]},
+          "replication_effect": {"type": ["number", "null"]},
+          "paired_difference": {"type": ["number", "null"]},
+          "paired_ci95": {
+            "type": ["array", "null"],
+            "items": {"type": "number"},
+            "minItems": 2,
+            "maxItems": 2
+          }
+        }
+      }
+    },
+    "behavior": {"type": "object"},
+    "selected_layers": {"type": "object"},
+    "negative_controls_valid": {"type": "boolean"},
+    "interpretation": {"type": "string"}
+  }
+}

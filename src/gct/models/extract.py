@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 
 import torch
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers.modeling_utils import PreTrainedModel
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from gct.config import ExperimentConfig
 from gct.models.anchor import anchor_positions, tokenize_batch
@@ -38,16 +39,16 @@ def extract_batch(
     prompts: list[str],
     config: ExperimentConfig,
 ) -> ActivationBatch:
-    encoded = tokenize_batch(tokenizer, prompts, config.model.device)
+    encoded = tokenize_batch(tokenizer, prompts, config, "activation")
     attention_mask = encoded["attention_mask"]
     positions = anchor_positions(attention_mask)
     batch_indices = torch.arange(len(prompts), device=positions.device)
     with torch.inference_mode():
-        outputs: Any = model(
+        outputs: Any = cast(Any, model)(
             **encoded, output_hidden_states=True, use_cache=False, return_dict=True
         )
     hidden_states = outputs.hidden_states
-    num_hidden_layers = int(model.config.num_hidden_layers)
+    num_hidden_layers = int(cast(Any, model).config.num_hidden_layers)
     if hidden_states is None or len(hidden_states) != num_hidden_layers + 1:
         found = None if hidden_states is None else len(hidden_states)
         raise RuntimeError(

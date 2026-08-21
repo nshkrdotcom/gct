@@ -6,18 +6,21 @@ import platform
 import re
 import subprocess
 from dataclasses import asdict, dataclass
+from pathlib import Path
 from typing import Any, cast
 
 import torch
-from huggingface_hub import model_info
+from huggingface_hub import model_info, snapshot_download
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    PreTrainedModel,
-    PreTrainedTokenizerBase,
 )
+from transformers.modeling_utils import PreTrainedModel
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from gct.config import ExperimentConfig
+from gct.models.adapters import validate_loaded_architecture
+from gct.storage.hashes import file_hash
 
 PYTORCH_INSTALL_URL = "https://pytorch.org/get-started/locally/"
 
@@ -131,7 +134,12 @@ def resolve_model_revision(config: ExperimentConfig) -> str:
     info = model_info(config.model.name, revision=config.model.revision)
     if not info.sha:
         raise RuntimeError(f"Hugging Face did not return a commit SHA for {config.model.name}")
-    return str(info.sha)
+    revision = str(info.sha)
+    if config.model.revision is not None and revision != config.model.revision:
+        raise RuntimeError(
+            f"resolved model revision {revision} differs from configured {config.model.revision}"
+        )
+    return revision
 
 
 def load_model_and_tokenizer(
@@ -144,7 +152,29 @@ def load_model_and_tokenizer(
         "float16": torch.float16,
         "float32": torch.float32,
     }[config.model.dtype]
-    tokenizer = AutoTokenizer.from_pretrained(
+    tokenizer = load_tokenizer(config, revision)
+    model = cast(
+        PreTrainedModel,
+        AutoModelForCausalLM.from_pretrained(
+            config.model.name,
+            revision=revision,
+            torch_dtype=dtype,
+            trust_remote_code=config.model.trust_remote_code,
+            attn_implementation="sdpa",
+            low_cpu_mem_usage=True,
+        ),
+    )
+    cast(Any, model).to(config.model.device)
+    cast(Any, model).eval()
+    validate_loaded_architecture(model, config)
+    return model, tokenizer, revision
+
+
+def load_tokenizer(
+    config: ExperimentConfig, resolved_revision: str | None = None
+) -> PreTrainedTokenizerBase:
+    revision = resolved_revision or resolve_model_revision(config)
+    tokenizer = cast(Any, AutoTokenizer).from_pretrained(
         config.model.name,
         revision=revision,
         trust_remote_code=config.model.trust_remote_code,
@@ -153,17 +183,48 @@ def load_model_and_tokenizer(
     if tokenizer.pad_token_id is None:
         tokenizer.pad_token_id = tokenizer.eos_token_id
     tokenizer.padding_side = "left"
-    model = cast(
-        PreTrainedModel,
-        AutoModelForCausalLM.from_pretrained(
-            config.model.name,
+    return cast(PreTrainedTokenizerBase, tokenizer)
+
+
+def _hashed_files(root: Path, source: str) -> list[dict[str, Any]]:
+    records: list[dict[str, Any]] = []
+    if not root.is_dir():
+        return records
+    for path in sorted(candidate for candidate in root.rglob("*") if candidate.is_file()):
+        records.append(
+            {
+                "source": source,
+                "source_path": str(path.relative_to(root)),
+                "source_sha256": file_hash(path),
+                "source_bytes": path.stat().st_size,
+            }
+        )
+    return records
+
+
+def model_source_file_records(config: ExperimentConfig, revision: str) -> list[dict[str, Any]]:
+    """Hash every locally materialized checkpoint/tokenizer/remote-code source file."""
+    snapshot = Path(
+        snapshot_download(
+            repo_id=config.model.name,
             revision=revision,
-            dtype=dtype,
-            trust_remote_code=config.model.trust_remote_code,
-            attn_implementation="sdpa",
-            low_cpu_mem_usage=True,
-        ),
+            local_files_only=True,
+        )
     )
-    cast(Any, model).to(config.model.device)
-    cast(Any, model).eval()
-    return model, tokenizer, revision
+    records = _hashed_files(snapshot, "huggingface_snapshot")
+    if config.model.trust_remote_code:
+        from transformers.utils.hub import HF_MODULES_CACHE
+
+        module_cache = Path(HF_MODULES_CACHE)
+        revision_roots = sorted(
+            {
+                Path(*path.parts[: path.parts.index(revision) + 1])
+                for path in module_cache.rglob("*.py")
+                if revision in path.parts
+            }
+        )
+        for root in revision_roots:
+            records.extend(_hashed_files(root, "transformers_remote_code_cache"))
+    if not records:
+        raise RuntimeError("no local files found for the loaded immutable model revision")
+    return records

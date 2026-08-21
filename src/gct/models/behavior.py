@@ -8,9 +8,11 @@ from dataclasses import dataclass
 from typing import Any, cast
 
 import torch
-from transformers import PreTrainedModel, PreTrainedTokenizerBase
+from transformers.modeling_utils import PreTrainedModel
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
 from gct.config import ExperimentConfig
+from gct.models.adapters import RESPONSE_PREFILL, get_model_adapter
 from gct.models.anchor import tokenize_batch
 
 NUMBER_PATTERN = re.compile(r"(?<![A-Za-z])[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?")
@@ -19,7 +21,6 @@ FINAL_PATTERN = re.compile(
     r"\s*[°]?[Cc]?(?=\s*(?:\n|$))",
     re.IGNORECASE,
 )
-RESPONSE_PREFILL = "FINAL="
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,27 +55,17 @@ def generate_batch(
 ) -> list[str]:
     if not config.model.deterministic_decoding:
         raise ValueError("confirmatory behavior evaluation requires deterministic decoding")
-    encoded = tokenize_batch(tokenizer, prompts, config.model.device)
-    # The prompt asks for this exact response form. Prefilling only its fixed
-    # prefix prevents verbose arithmetic from consuming the answer budget while
-    # leaving the numeric prediction entirely model-generated.
-    prefix_ids = tokenizer.encode(RESPONSE_PREFILL, add_special_tokens=False)
-    if not prefix_ids:
-        raise RuntimeError("behavior response prefill tokenized to an empty sequence")
-    prefix = torch.tensor(prefix_ids, dtype=encoded["input_ids"].dtype, device=config.model.device)
-    prefix = prefix.unsqueeze(0).expand(len(prompts), -1)
-    encoded["input_ids"] = torch.cat((encoded["input_ids"], prefix), dim=1)
-    prefix_mask = torch.ones_like(prefix, dtype=encoded["attention_mask"].dtype)
-    encoded["attention_mask"] = torch.cat((encoded["attention_mask"], prefix_mask), dim=1)
+    encoded = tokenize_batch(tokenizer, prompts, config, "behavior")
     input_width = encoded["input_ids"].shape[1]
+    eos_token_id = get_model_adapter(config).generation_eos_token_id(tokenizer)
     with torch.inference_mode():
         generated: Any = cast(Any, model).generate(
             **encoded,
             do_sample=False,
             max_new_tokens=config.model.max_new_tokens,
             pad_token_id=tokenizer.pad_token_id,
-            eos_token_id=tokenizer.eos_token_id,
+            eos_token_id=eos_token_id,
             use_cache=True,
         )
     decoded = [tokenizer.decode(row[input_width:], skip_special_tokens=True) for row in generated]
-    return [RESPONSE_PREFILL + cast(str, value).strip() for value in decoded]
+    return [RESPONSE_PREFILL + value.strip() for value in decoded]

@@ -13,12 +13,19 @@ from gct.analysis.stats import run_statistics
 from gct.config import load_config
 from gct.data.generate import build_dataset, validate_dataset_path
 from gct.metrics.evaluate import evaluate_metrics
+from gct.models.audit import audit_model_adapter, probe_operational_batch
 from gct.models.loader import runtime_report
 from gct.operators.fit import fit_transport_operators
 from gct.pipeline import run_pipeline
 from gct.probes.hidden_coordinate import fit_hidden_coordinate_probes
+from gct.provenance import freeze_model2_preregistration
+from gct.reporting.cross_model import build_cross_model_report
 from gct.reporting.report import build_report
-from gct.storage.activations import evaluate_behavior_shards, extract_activation_shards
+from gct.storage.activations import (
+    audit_canonical_duplicates,
+    evaluate_behavior_shards,
+    extract_activation_shards,
+)
 from gct.verify import verify_run
 
 app = typer.Typer(no_args_is_help=True, help="Geometry of Conditional Truth research pipeline.")
@@ -31,6 +38,10 @@ metrics_app = typer.Typer(no_args_is_help=True)
 stats_app = typer.Typer(no_args_is_help=True)
 report_app = typer.Typer(no_args_is_help=True)
 inspect_app = typer.Typer(no_args_is_help=True)
+model_app = typer.Typer(no_args_is_help=True)
+preregister_app = typer.Typer(no_args_is_help=True)
+audit_app = typer.Typer(no_args_is_help=True)
+compare_app = typer.Typer(no_args_is_help=True)
 app.add_typer(dataset_app, name="dataset")
 app.add_typer(activations_app, name="activations")
 app.add_typer(behavior_app, name="behavior")
@@ -40,6 +51,10 @@ app.add_typer(metrics_app, name="metrics")
 app.add_typer(stats_app, name="stats")
 app.add_typer(report_app, name="report")
 app.add_typer(inspect_app, name="inspect")
+app.add_typer(model_app, name="model")
+app.add_typer(preregister_app, name="preregister")
+app.add_typer(audit_app, name="audit")
+app.add_typer(compare_app, name="compare")
 
 ConfigOption = Annotated[Path, typer.Option("--config", exists=True, dir_okay=False)]
 
@@ -101,6 +116,34 @@ def behavior_evaluate(config: ConfigOption, resume: bool = False) -> None:
     _print({"run_id": cfg.run_id, "run_dir": run_dir, "status": "behavior_complete"})
 
 
+@model_app.command("audit")
+def model_audit(config: ConfigOption) -> None:
+    cfg = load_config(config)
+    run_dir = audit_model_adapter(cfg, _repo_root())
+    _print({"run_id": cfg.run_id, "run_dir": run_dir, "status": "model_adapter_audit_complete"})
+
+
+@model_app.command("probe-batch")
+def model_probe_batch(config: ConfigOption) -> None:
+    cfg = load_config(config)
+    run_dir = probe_operational_batch(cfg, _repo_root())
+    _print({"run_id": cfg.run_id, "run_dir": run_dir, "status": "operational_probe_complete"})
+
+
+@preregister_app.command("freeze")
+def preregister_freeze(config: ConfigOption) -> None:
+    cfg = load_config(config)
+    run_dir = freeze_model2_preregistration(cfg, _repo_root())
+    _print({"run_id": cfg.run_id, "run_dir": run_dir, "status": "preregistration_frozen"})
+
+
+@audit_app.command("duplicates")
+def audit_duplicates(config: ConfigOption) -> None:
+    cfg = load_config(config)
+    run_dir = audit_canonical_duplicates(cfg, _repo_root())
+    _print({"run_id": cfg.run_id, "run_dir": run_dir, "status": "duplicate_audit_complete"})
+
+
 @transport_app.command("fit")
 def transport_fit(config: ConfigOption) -> None:
     cfg = load_config(config)
@@ -134,6 +177,18 @@ def report_build(config: ConfigOption) -> None:
     cfg = load_config(config)
     build_report(cfg, _repo_root())
     _print({"run_id": cfg.run_id, "status": "complete"})
+
+
+@compare_app.command("models")
+def compare_models(
+    baseline_run: Annotated[str, typer.Option("--baseline-run")],
+    replication_run: Annotated[str, typer.Option("--replication-run")],
+) -> None:
+    """Build the paired base-world Model #1 versus Model #2 report."""
+    path = build_cross_model_report(
+        _repo_root(), _run_path(baseline_run), _run_path(replication_run)
+    )
+    _print({"report": path, "status": "cross_model_complete"})
 
 
 @app.command("run")

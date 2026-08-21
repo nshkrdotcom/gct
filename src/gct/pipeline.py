@@ -8,11 +8,16 @@ from gct.analysis.stats import run_statistics
 from gct.config import ExperimentConfig
 from gct.data.generate import build_dataset, validate_dataset_path
 from gct.metrics.evaluate import evaluate_metrics
+from gct.models.audit import audit_model_adapter, probe_operational_batch
 from gct.operators.fit import fit_transport_operators
 from gct.probes.hidden_coordinate import fit_hidden_coordinate_probes
-from gct.provenance import initialize_run
+from gct.provenance import freeze_model2_preregistration, initialize_run
 from gct.reporting.report import build_report
-from gct.storage.activations import evaluate_behavior_shards, extract_activation_shards
+from gct.storage.activations import (
+    audit_canonical_duplicates,
+    evaluate_behavior_shards,
+    extract_activation_shards,
+)
 from gct.storage.hashes import file_hash
 from gct.storage.manifests import read_json
 
@@ -64,8 +69,16 @@ def run_pipeline(config: ExperimentConfig, repo_root: Path, *, resume: bool = Fa
         validate_dataset_path(run_dir)
     else:
         build_dataset(config, repo_root)
+    if (
+        config.model.name == "microsoft/Phi-4-mini-instruct"
+        and config.reporting.scientific_claims_allowed
+    ):
+        audit_model_adapter(config, repo_root)
+        probe_operational_batch(config, repo_root)
+        freeze_model2_preregistration(config, repo_root)
     extract_activation_shards(config, repo_root, resume=resume)
     evaluate_behavior_shards(config, repo_root, resume=resume)
+    audit_canonical_duplicates(config, repo_root)
     if not (
         resume and _complete("operators", run_dir / "operators" / "manifest.json", config, run_dir)
     ):

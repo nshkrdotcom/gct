@@ -1,0 +1,111 @@
+project:
+  name: geometry-of-conditional-truth
+  protocol_version: gct-v0.2-phi4mini-ci
+  seed: 20260819
+  run_root: runs
+model:
+  name: microsoft/Phi-4-mini-instruct
+  revision: 4b00ec8714b0cb224e4fb33380cbf0919f177f3e
+  dtype: bfloat16
+  device: cuda
+  quantization: none
+  trust_remote_code: true
+  chat_template: official
+  deterministic_decoding: true
+  duplicate_prompt_policy: canonical_first_occurrence
+  max_new_tokens: 16
+  adapter_protocol: phi4mini-v2
+hardware:
+  min_vram_gb: 14
+  allow_cpu_offload: false
+  dynamic_batching: true
+  initial_batch_size: 2
+world:
+  name: toythermo
+  version: toythermo-v1-fields-v1
+  pressure_range: [0.2, 3.0]
+  concentration_range: [0.0, 2.0]
+  fluids:
+    Aquila: {a: 95.0, b: 18.0, k: 0.55, q: 0.18}
+    Boreal: {a: 76.0, b: 13.0, k: 0.90, q: -0.12}
+    Cyrene: {a: 58.0, b: 21.0, k: 0.35, q: 0.24}
+  calibration_sensor: {r0: 40.0, r1: 7.0}
+  familiar_aliases: {Aquila: Water, Boreal: Ethanol, Cyrene: Acetone}
+  renamed_fields: {temperature: Z, pressure: X, hidden: V, concentration: Y, sensor: G, fluid: Entity, nuisance: W}
+splits:
+  train_base_worlds: 4
+  validation_base_worlds: 2
+  test_base_worlds: 2
+  group_key: base_world_id
+  holdout_renderer_family: json_like
+  holdout_fluid_on_secondary_test: Cyrene
+arms: [explicit_coordinate, inferable_unnamed_coordinate, unobservable_coordinate, irrelevant_coordinate, semantic_renaming]
+transforms:
+  nuisance:
+    paraphrase_variants: 2
+    formats: [prose, bullets, json_like, active_passive, clause_order, lexical_alias]
+    personas: [neutral, engineer]
+    include_irrelevant_fact: true
+  pressure_deltas:
+    train: [-0.2, 0.2]
+    validation: [-0.3, 0.3]
+    test: [-0.1, 0.1]
+  concentration_deltas:
+    train: [-0.2, 0.2]
+    validation: [-0.3, 0.3]
+    test: [-0.1, 0.1]
+  keep_transformed_states_in_domain: true
+activations:
+  token_position: final_common_anchor
+  layers: [0, 10, 21, 31]
+  storage_dtype: float16
+  shard_size: 8
+  save_full_sequence: false
+  common_suffix_tokens: 4
+  duplicate_prompt_policy: canonical_first_occurrence
+preprocessing:
+  pca_dims: [2, 4]
+  whitening: true
+  fit_split: train
+operators:
+  baselines: [identity, mean_shift, affine_ridge]
+  affine_ridge_alpha: 1.0
+  low_rank:
+    ranks: [1, 2]
+    ridge_alpha: 1.0
+    lr: 0.001
+    weight_decay: 0.0001
+    max_epochs: 3
+    early_stopping_patience: 2
+  generator:
+    enabled: true
+    reduced_dims: [2, 4]
+    regularization: 0.01
+metrics:
+  distances: [cosine, standardized_l2, whitened_l2]
+  primary_distance: whitened_l2
+  behavior_tolerance_c: 0.5
+  normalize_transport_against: identity
+statistics:
+  bootstrap_replicates: 20
+  permutation_replicates: 10
+  fdr_alpha: 0.05
+  test_alpha: 0.05
+  group_key: base_world_id
+mdl:
+  lambda_values: [0.0, 0.1, 1.0]
+reporting:
+  save_raw_tables: true
+  save_figures: true
+  include_all_preregistered_hypotheses: true
+  include_negative_results: true
+  scientific_claims_allowed: false
+preregistration:
+  H1: {title: Nuisance versus substantive separability, endpoint: Development-only grouped difference., decision_rule: No scientific decision from CI configuration.}
+  H2: {title: Reusable transport, endpoint: Development-only transport comparison., decision_rule: No scientific decision from CI configuration.}
+  H3: {title: Continuous composition, endpoint: Development-only generator comparison., decision_rule: No scientific decision from CI configuration.}
+  H4: {title: Structural defects predict behavior, endpoint: Development-only association., decision_rule: No scientific decision from CI configuration.}
+  H5: {title: Inferable omitted coordinate in residuals, endpoint: Development-only residual probe., decision_rule: No scientific decision from CI configuration.}
+  H6: {title: Unobservable-coordinate negative control, endpoint: Identical-prompt leakage check., decision_rule: Must not exceed development null.}
+  H7: {title: Informative base lift, endpoint: Development-only base comparison., decision_rule: No scientific decision from CI configuration.}
+  H8: {title: Semantic-renaming robustness, endpoint: Development-only alias comparison., decision_rule: No scientific decision from CI configuration.}

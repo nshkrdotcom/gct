@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import hashlib
 import json
 import math
 from collections.abc import Callable
@@ -16,14 +17,23 @@ from safetensors.torch import load_file, save_file
 
 from gct.config import ExperimentConfig
 from gct.data.generate import validate_dataset_path
-from gct.data.prompts import PromptRenderer
-from gct.models.behavior import RESPONSE_PREFILL, generate_batch, parse_numeric_answer
+from gct.models.adapters import (
+    RESPONSE_PREFILL,
+    anchor_suffix_ids,
+    get_model_adapter,
+    model_architecture_metadata,
+)
+from gct.models.behavior import generate_batch, parse_numeric_answer
 from gct.models.extract import extract_batch
-from gct.models.loader import load_model_and_tokenizer, resolve_model_revision, runtime_report
+from gct.models.loader import (
+    load_model_and_tokenizer,
+    model_source_file_records,
+    resolve_model_revision,
+    runtime_report,
+)
 from gct.provenance import update_run_manifest
 from gct.storage.hashes import file_hash
 from gct.storage.manifests import artifact_record, read_json, write_json_atomic
-from gct.worlds.toythermo import ToyThermo
 
 T = TypeVar("T")
 
@@ -198,32 +208,64 @@ def extract_activation_shards(
     model, tokenizer, loaded_revision = load_model_and_tokenizer(config, revision)
     if loaded_revision != revision:
         raise RuntimeError("loaded model revision differs from frozen activation revision")
-    renderer = PromptRenderer(ToyThermo(config.world))
-    anchor_suffix = renderer.assert_common_anchor(
+    anchor_suffix = anchor_suffix_ids(
         tokenizer,
         _representative_prompts(frame),
+        config,
         config.activations.common_suffix_tokens,
     )
-    num_layers = int(model.config.num_hidden_layers)
-    hidden_size = int(model.config.hidden_size)
+    architecture = model_architecture_metadata(model)
+    num_layers = int(cast(Any, architecture["num_hidden_layers"]))
+    hidden_size = int(cast(Any, architecture["hidden_size"]))
     shard_size = config.activations.shard_size
     total_shards = math.ceil(len(frame) / shard_size)
+    source_files = model_source_file_records(config, revision)
+    checkpoint_bytes = sum(
+        int(record["source_bytes"])
+        for record in source_files
+        if str(record["source_path"]).endswith((".safetensors", ".bin"))
+    )
     base_manifest: dict[str, Any] = {
         "schema_version": "gct-activations-v1",
         "status": "in_progress",
         "config_hash": config.config_hash,
         "dataset_hash": dataset_manifest["logical_dataset_hash"],
         "dataset_rows": len(frame),
+        "model_adapter_audit_hash": (
+            file_hash(run_dir / "model_adapter" / "anchor_audit.json")
+            if (run_dir / "model_adapter" / "anchor_audit.json").is_file()
+            else None
+        ),
+        "operational_probe_hash": (
+            file_hash(run_dir / "model_adapter" / "operational_probe.json")
+            if (run_dir / "model_adapter" / "operational_probe.json").is_file()
+            else None
+        ),
+        "preregistration_freeze_hash": (
+            read_json(run_dir / "preregistration_frozen.json").get("freeze_hash")
+            if (run_dir / "preregistration_frozen.json").is_file()
+            else None
+        ),
         "model_name": config.model.name,
+        "model_adapter_protocol": config.model.adapter_protocol,
         "model_revision": revision,
         "tokenizer_name": tokenizer.name_or_path,
         "tokenizer_class": tokenizer.__class__.__name__,
         "tokenizer_revision": revision,
+        "model_source_files": source_files,
+        "checkpoint_weight_bytes": checkpoint_bytes,
+        "parameter_count": sum(parameter.numel() for parameter in cast(Any, model).parameters()),
+        "parameter_dtype": str(next(cast(Any, model).parameters()).dtype),
         "anchor_suffix_token_ids": list(anchor_suffix),
-        "anchor_semantics": "final token of official assistant-generation anchor",
+        "anchor_semantics": (
+            "final token of official assistant-generation header"
+            if config.model.name == "Qwen/Qwen3-4B"
+            else "final token of fixed FINAL= response prefill after official assistant header"
+        ),
         "embedding_stored_separately": True,
         "model_num_hidden_layers": num_layers,
         "model_hidden_size": hidden_size,
+        "model_architecture": architecture,
         "configured_layers": config.activations.layers,
         "storage_dtype": config.activations.storage_dtype,
         "extraction_settings": {
@@ -510,6 +552,8 @@ def evaluate_behavior_shards(
             "do_sample": False,
             "max_new_tokens": config.model.max_new_tokens,
             "response_prefill": RESPONSE_PREFILL,
+            "model_adapter_protocol": config.model.adapter_protocol,
+            "eos_token_id": get_model_adapter(config).generation_eos_token_id(tokenizer),
             "protocol": "deterministic-greedy-prefill-v1",
             "duplicate_prompt_policy": config.model.duplicate_prompt_policy,
         },
@@ -592,4 +636,132 @@ def evaluate_behavior_shards(
     gc.collect()
     if torch.cuda.is_available():
         torch.cuda.empty_cache()
+    return run_dir
+
+
+def audit_canonical_duplicates(config: ExperimentConfig, repo_root: Path) -> Path:
+    """Independently verify exact duplicate equality after canonicalization."""
+    run_dir = config.run_dir(repo_root)
+    frame = pd.read_parquet(run_dir / "dataset" / "samples.parquet")
+    activation_manifest = read_json(run_dir / "activations" / "manifest.json")
+    behavior_manifest = read_json(run_dir / "behavior" / "manifest.json")
+    if (
+        activation_manifest.get("status") != "complete"
+        or behavior_manifest.get("status") != "complete"
+    ):
+        raise ValueError("activation and behavior stages must be complete before duplicate audit")
+    path = run_dir / "duplicate_audit.json"
+    activation_manifest_hash = file_hash(run_dir / "activations" / "manifest.json")
+    behavior_manifest_hash = file_hash(run_dir / "behavior" / "manifest.json")
+    if path.is_file():
+        existing = read_json(path)
+        if (
+            existing.get("status") == "complete"
+            and existing.get("config_hash") == config.config_hash
+            and existing.get("activation_manifest_sha256") == activation_manifest_hash
+            and existing.get("behavior_manifest_sha256") == behavior_manifest_hash
+        ):
+            return run_dir
+        raise ValueError("existing duplicate audit differs from current model-output manifests")
+    duplicate_hashes = set(
+        frame.loc[frame["prompt_hash"].duplicated(keep=False), "prompt_hash"].astype(str)
+    )
+    canonical_states: dict[str, tuple[str, ...]] = {}
+    compared_rows = 0
+    mismatched_activation_rows = 0
+    mismatched_state_comparisons = 0
+    state_comparisons = 0
+    for record in sorted(activation_manifest["shards"], key=lambda item: int(item["shard_number"])):
+        tensors = load_file(run_dir / str(record["path"]), device="cpu")
+        activations = tensors["activations"]
+        embeddings = tensors["embeddings"]
+        start = int(record["start"])
+        rows = int(record["rows"])
+        hashes = frame.iloc[start : start + rows]["prompt_hash"].astype(str).tolist()
+        for offset, prompt_hash in enumerate(hashes):
+            if prompt_hash not in duplicate_hashes:
+                continue
+            state_hashes = (
+                hashlib.sha256(embeddings[offset].numpy().tobytes()).hexdigest(),
+                *(
+                    hashlib.sha256(activations[offset, layer].numpy().tobytes()).hexdigest()
+                    for layer in range(activations.shape[1])
+                ),
+            )
+            if prompt_hash not in canonical_states:
+                canonical_states[prompt_hash] = state_hashes
+                continue
+            compared_rows += 1
+            reference = canonical_states[prompt_hash]
+            differences = sum(
+                left != right for left, right in zip(reference, state_hashes, strict=True)
+            )
+            state_comparisons += len(state_hashes)
+            mismatched_state_comparisons += differences
+            mismatched_activation_rows += int(differences > 0)
+        del tensors, activations, embeddings
+    behavior = pd.read_parquet(run_dir / "behavior" / "results.parquet")
+    if behavior["sample_id"].astype(str).tolist() != frame["sample_id"].astype(str).tolist():
+        raise ValueError("behavior result order differs from dataset during duplicate audit")
+    canonical_responses: dict[str, str] = {}
+    compared_responses = 0
+    mismatched_responses = 0
+    for prompt_hash, response in zip(frame["prompt_hash"], behavior["raw_output"], strict=True):
+        key = str(prompt_hash)
+        if key not in duplicate_hashes:
+            continue
+        value = str(response)
+        if key not in canonical_responses:
+            canonical_responses[key] = value
+            continue
+        compared_responses += 1
+        mismatched_responses += int(value != canonical_responses[key])
+    by_id = frame.set_index("sample_id", drop=False)
+    unobservable = frame[
+        (frame["coordinate_condition"] == "unobservable_coordinate")
+        & (frame["transform_name"] == "pressure_shift")
+    ]
+    unobservable_activation_mismatches = 0
+    unobservable_response_mismatches = 0
+    response_by_id = behavior.set_index("sample_id")["raw_output"]
+    for row in unobservable.itertuples(index=False):
+        source = by_id.loc[str(row.source_sample_id)]
+        source_hash = str(source.prompt_hash)
+        target_hash = str(row.prompt_hash)
+        unobservable_activation_mismatches += int(
+            canonical_states[source_hash] != canonical_states[target_hash]
+        )
+        unobservable_response_mismatches += int(
+            str(response_by_id.loc[str(row.source_sample_id)])
+            != str(response_by_id.loc[str(row.sample_id)])
+        )
+    if (
+        mismatched_activation_rows
+        or mismatched_state_comparisons
+        or mismatched_responses
+        or unobservable_activation_mismatches
+        or unobservable_response_mismatches
+    ):
+        raise RuntimeError("post-canonicalization duplicate audit found an exact mismatch")
+    payload = {
+        "schema_version": "gct-duplicate-audit-v2",
+        "status": "complete",
+        "config_hash": config.config_hash,
+        "activation_manifest_sha256": activation_manifest_hash,
+        "behavior_manifest_sha256": behavior_manifest_hash,
+        "policy": "canonical_first_occurrence",
+        "stored_states_per_row": 1 + len(activation_manifest["shards"][0]["layer_numbers"]),
+        "duplicate_prompt_hashes": len(duplicate_hashes),
+        "compared_duplicate_rows": compared_rows,
+        "activation_state_comparisons": state_comparisons,
+        "mismatched_activation_rows": mismatched_activation_rows,
+        "mismatched_activation_state_comparisons": mismatched_state_comparisons,
+        "compared_duplicate_responses": compared_responses,
+        "mismatched_duplicate_responses": mismatched_responses,
+        "unobservable_pairs": len(unobservable),
+        "unobservable_activation_mismatches": unobservable_activation_mismatches,
+        "unobservable_response_mismatches": unobservable_response_mismatches,
+    }
+    write_json_atomic(path, payload)
+    update_run_manifest(run_dir, duplicate_audit_hash=file_hash(path))
     return run_dir

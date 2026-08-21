@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import pandas as pd
 
+from gct.analysis.cross_model import primary_endpoint_effect
 from gct.config import ExperimentConfig
 from gct.models.loader import runtime_report
 from gct.provenance import git_commit, update_run_manifest
@@ -16,9 +17,29 @@ from gct.storage.manifests import artifact_record, read_json, write_json_atomic
 
 
 def _fmt(value: Any) -> str:
+    if value is None:
+        return "—"
     if isinstance(value, float):
         return f"{value:.4g}"
     return str(value)
+
+
+def _h7_behavior_text(record: dict[str, Any]) -> str:
+    gain = record.get("behavioral_gain", {})
+    if not isinstance(gain, dict):
+        return "inconclusive (behavior payload malformed)"
+    explicit = gain.get("explicit")
+    irrelevant = gain.get("irrelevant_q")
+    if isinstance(explicit, dict) and isinstance(irrelevant, dict):
+        return (
+            f"explicit={_fmt(explicit.get('estimate'))} "
+            f"[95% CI {_fmt(explicit.get('ci_95', [None, None])[0])}, "
+            f"{_fmt(explicit.get('ci_95', [None, None])[1])}]; "
+            f"Q={_fmt(irrelevant.get('estimate'))} "
+            f"[95% CI {_fmt(irrelevant.get('ci_95', [None, None])[0])}, "
+            f"{_fmt(irrelevant.get('ci_95', [None, None])[1])}]"
+        )
+    return str(gain.get("status", "inconclusive_due_to_parse_failures"))
 
 
 def _hypothesis_line(name: str, record: dict[str, Any]) -> str:
@@ -68,8 +89,7 @@ def _hypothesis_line(name: str, record: dict[str, Any]) -> str:
     if name == "H7":
         evidence.append(
             f"Q structural={_fmt(record['structural_gain']['irrelevant_q']['estimate'])}; "
-            f"explicit behavior={_fmt(record['behavioral_gain']['explicit']['estimate'])}; "
-            f"Q behavior={_fmt(record['behavioral_gain']['irrelevant_q']['estimate'])}"
+            f"behavior={_h7_behavior_text(record)}"
         )
     if not evidence:
         evidence.append(str(record.get("endpoint", "see machine-readable result")))
@@ -107,6 +127,14 @@ def _root_report_text(report_text: str, run_id: str) -> str:
     )
 
 
+def scientific_report_name(config: ExperimentConfig) -> str | None:
+    if not config.reporting.scientific_claims_allowed:
+        return None
+    if config.model.name == "microsoft/Phi-4-mini-instruct":
+        return "REPORT_MODEL2.md"
+    return "REPORT.md"
+
+
 def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
     run_dir = config.run_dir(repo_root)
     statistics = read_json(run_dir / "statistics" / "hypotheses.json")
@@ -123,6 +151,36 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
     runtime = runtime_report(config)
     behavior_summary = pd.read_parquet(run_dir / "statistics" / "behavior_primary_summary.parquet")
     behavior_overall = behavior_summary[behavior_summary["scope"] == "all"].set_index("metric")
+    is_model2 = config.model.name == "microsoft/Phi-4-mini-instruct"
+    model2_comparison_lines: list[str] = []
+    if is_model2:
+        baseline_path = (
+            repo_root / "runs" / "gct-v0.1-db5a41461117" / "statistics" / "hypotheses.json"
+        )
+        baseline_hypotheses = read_json(baseline_path)["hypotheses"]
+        model2_comparison_lines = [
+            "",
+            "### Frozen Model #1 comparison",
+            "",
+            "| Endpoint | Model #1 effect | Model #1 status | Model #2 effect | Model #2 status |",
+            "|---|---:|---|---:|---|",
+        ]
+        for name in (f"H{number}" for number in range(1, 9)):
+            baseline_effect, _ = primary_endpoint_effect(name, baseline_hypotheses[name])
+            replication_effect, _ = primary_endpoint_effect(name, hypotheses[name])
+            model2_comparison_lines.append(
+                f"| {name} | {_fmt(baseline_effect)} | {baseline_hypotheses[name]['status']} | "
+                f"{_fmt(replication_effect)} | {hypotheses[name]['status']} |"
+            )
+        model2_comparison_lines.extend(
+            [
+                "",
+                "H1 is wrong-sign in both families and H2/H3/H4/H7/H8 remain unsupported. "
+                "H5 is the sole status divergence: Phi supports residual hidden-pressure decoding "
+                "while Qwen does not; H6 passes for both. The paired confidence intervals and "
+                "behavior/resource contrasts are in `REPORT_CROSS_MODEL.md`.",
+            ]
+        )
 
     def behavior_metric(name: str) -> str:
         if name not in behavior_overall.index:
@@ -172,7 +230,11 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
             f"at `{quality['git']['verified_commit']}`",
         ]
     lines = [
-        "# Geometry of Conditional Truth — Run Report",
+        (
+            "# Geometry of Conditional Truth — Model #2 Replication Report"
+            if is_model2
+            else "# Geometry of Conditional Truth — Run Report"
+        ),
         "",
         "## 1. Executive result",
         "",
@@ -181,7 +243,14 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         "were evaluated only after the selection artifact was frozen. The run tested all five "
         "coordinate/control arms and both arbitrary and familiar-label versions. "
         f"Across H1–H8, the status counts were {status_counts.to_dict()}. "
-        f"The conservative interpretation is Level {level} of 6. This is evidence about empirical "
+        f"The conservative interpretation is Level {level} of 6. "
+        + (
+            "The broad v0 transport null replicates across a second model family, while H5 shows a "
+            "control-safe family difference in residual decodability. "
+            if is_model2
+            else ""
+        )
+        + "This is evidence about empirical "
         "transport proxies in one synthetic task and one model, not evidence that coherence proves "
         "truth or that the model literally contains a sheaf, bifibration, or universal truth manifold.",
         "",
@@ -194,8 +263,14 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         f"`{runtime.torch_cuda_runtime}`",
         f"- PyTorch: `{runtime.torch}`",
         f"- Model: `{activations['model_name']}` at revision `{activations['model_revision']}`",
+        f"- Model adapter protocol / remote code: `{activations.get('model_adapter_protocol')}` / "
+        f"`{config.model.trust_remote_code}` (immutable revision only)",
         f"- Dtype/storage: `{config.model.dtype}` / `{activations['storage_dtype']}`",
         f"- Layers/hidden size: {activations['model_num_hidden_layers']} / {activations['model_hidden_size']}",
+        f"- Runtime-discovered parameters/checkpoint bytes: "
+        f"`{activations.get('parameter_count')}` / `{activations.get('checkpoint_weight_bytes')}`",
+        f"- Hashed checkpoint/config/tokenizer/code files: "
+        f"`{len(activations.get('model_source_files', []))}`",
         f"- Repository commit at report build: `{git_commit(repo_root)}`",
         f"- Config hash: `{config.config_hash}`",
         f"- Dependency lock hash: `{run_manifest.get('dependency_lock_hash')}`",
@@ -217,6 +292,16 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         f"- Common anchor token IDs: `{activations['anchor_suffix_token_ids']}`",
         f"- Frozen selection certifies test data used: `{selection['test_data_used']}`",
         f"- Probe permutation replicates: {probes['permutation_replicates']}",
+        *(
+            [
+                f"- Model-adapter anchor audit: `{activations.get('model_adapter_audit_hash')}`; "
+                f"token suffix `{activations['anchor_suffix_token_ids']}`",
+                f"- Pre-test preregistration freeze: "
+                f"`{activations.get('preregistration_freeze_hash')}`",
+            ]
+            if is_model2
+            else []
+        ),
         *quality_lines,
         "",
         "Held-out primary behavior metrics (grouped bootstrap by base world):",
@@ -238,12 +323,22 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         f"transformation counts are `{dataset['counts']['by_transform']}`. "
         f"The oracle is `{dataset['world_version']}`, computed exclusively in Python. Transformation magnitudes, "
         "the JSON-like renderer, and Cyrene entity evaluation follow the frozen held-out design.",
+        *(
+            [
+                "Model #2 reused the Model #1 Parquet sample byte-for-byte from the immutable "
+                "`gct-v0.1-db5a41461117` evidence run. Stable row, group, and split IDs were checked "
+                "for exact equality before inference; no sample was regenerated or re-randomized."
+            ]
+            if is_model2
+            else []
+        ),
         "",
         "## 6. Preregistered hypotheses",
         "",
         "| Hypothesis | Title | Status | Primary evidence |",
         "|---|---|---|---|",
         *[_hypothesis_line(name, hypotheses[name]) for name in sorted(hypotheses)],
+        *model2_comparison_lines,
         "",
         "Effect signs were fixed in advance: H1 is nuisance minus substantive displacement "
         "(support requires a wholly negative interval); H2/H3 are one minus candidate-to-baseline "
@@ -258,21 +353,16 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         f"{_fmt(hypotheses['H7']['structural_gain']['explicit']['ci_95'][1])}], versus "
         f"[{_fmt(hypotheses['H7']['structural_gain']['irrelevant_q']['ci_95'][0])}, "
         f"{_fmt(hypotheses['H7']['structural_gain']['irrelevant_q']['ci_95'][1])}] for Q. "
-        f"Behavioral gains were {_fmt(hypotheses['H7']['behavioral_gain']['explicit']['estimate'])} "
-        f"[{_fmt(hypotheses['H7']['behavioral_gain']['explicit']['ci_95'][0])}, "
-        f"{_fmt(hypotheses['H7']['behavioral_gain']['explicit']['ci_95'][1])}] for explicit P and "
-        f"{_fmt(hypotheses['H7']['behavioral_gain']['irrelevant_q']['estimate'])} "
-        f"[{_fmt(hypotheses['H7']['behavioral_gain']['irrelevant_q']['ci_95'][0])}, "
-        f"{_fmt(hypotheses['H7']['behavioral_gain']['irrelevant_q']['ci_95'][1])}] for Q; the "
+        f"Behavioral gains were {_h7_behavior_text(hypotheses['H7'])}; the "
         "preregistered non-overlap/superiority rule failed.",
         "",
         f"For H8, renamed H2 had 95% CI "
         f"[{_fmt(hypotheses['H8']['H2']['ci_95'][0])}, "
         f"{_fmt(hypotheses['H8']['H2']['ci_95'][1])}]. Renamed H5's R² interval was "
         f"[{_fmt(hypotheses['H8']['H5']['test_r2_ci_95'][0])}, "
-        f"{_fmt(hypotheses['H8']['H5']['test_r2_ci_95'][1])}]; despite p="
-        f"{_fmt(hypotheses['H8']['H5']['permutation_p_value'])}, its negative point R² failed the "
-        "joint decision rule. Renamed H7's explicit structural interval was "
+        f"{_fmt(hypotheses['H8']['H5']['test_r2_ci_95'][1])}]; p="
+        f"{_fmt(hypotheses['H8']['H5']['permutation_p_value'])}, with recorded status "
+        f"`{hypotheses['H8']['H5']['status']}`. Renamed H7's explicit structural interval was "
         f"[{_fmt(hypotheses['H8']['H7']['ci_95'][0])}, "
         f"{_fmt(hypotheses['H8']['H7']['ci_95'][1])}], so replication remained unsupported.",
         "",
@@ -302,8 +392,11 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         f"{_fmt(hypotheses['H6']['null_r2_95th_percentile'])}). H7's explicit-P structural gain was "
         f"{_fmt(hypotheses['H7']['structural_gain']['explicit']['estimate'])}, versus "
         f"{_fmt(hypotheses['H7']['structural_gain']['irrelevant_q']['estimate'])} for irrelevant Q; "
-        "the preregistered superiority rule was not met. In the familiar-label world, H2, H5, and "
-        "H7 remained unsupported while H6 again passed. A failed H6 would invalidate positive "
+        "the preregistered superiority rule was not met. In the familiar-label world, nested "
+        f"statuses were H2=`{hypotheses['H8']['H2']['status']}`, "
+        f"H5=`{hypotheses['H8']['H5']['status']}`, H6=`{hypotheses['H8']['H6']['status']}`, and "
+        f"H7=`{hypotheses['H8']['H7']['status']}`; the joint H8 gate remained unsupported. "
+        "A failed H6 would invalidate positive "
         "hidden-coordinate interpretation until leakage was resolved.",
         "",
         f"Raw batched extraction showed numerical batch-boundary sensitivity in "
@@ -314,7 +407,12 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         "rows. Because identical token sequences cannot contain a row-specific hidden coordinate, the "
         "preregistered `canonical_first_occurrence` policy rewrote each duplicate prompt from its first "
         "dataset occurrence before analysis. The final exact audit is recorded above. An earlier "
-        "batch-sensitive run was superseded rather than reported.",
+        + (
+            "adapter-generation run with an incomplete EOS configuration was superseded before any "
+            "full behavior shard or test metric existed."
+            if is_model2
+            else "batch-sensitive run was superseded rather than reported."
+        ),
         "",
         "## 9. Interpretation level",
         "",
@@ -335,15 +433,28 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         "",
         "## 11. Limitations",
         "",
-        "One 4B instruction model, one anchor, a synthetic arithmetic world, linear/reduced-rank operators, "
+        (
+            "Two approximately 4B instruction-model families now share the protocol, but Model #2 "
+            "still uses one checkpoint per family, one anchor, and a synthetic arithmetic world; "
+            if is_model2
+            else "One 4B instruction model, one anchor, and a synthetic arithmetic world; "
+        )
+        + "linear/reduced-rank operators, "
         "representation-dependent distances, observational activations, finite permutation/bootstrap "
         "precision, and possible prompt-computation confounds limit inference. Familiar labels may invoke "
         "pretraining priors even though the prompt overrides chemistry. See `docs/LIMITATIONS.md`.",
         "",
         "## 12. Next experiment",
         "",
-        "The single most informative follow-up is a preregistered replication on a second model family at "
-        "matched data and compute, preserving the identical-prompt negative control and frozen analysis.",
+        (
+            "The single most informative follow-up is a new v0.3 preregistration that changes the "
+            "representational object—such as trajectories or causal activation effects—while preserving "
+            "the identical-prompt negative control and frozen train/validation/test discipline."
+            if is_model2
+            else "The single most informative follow-up is a preregistered replication on a second model "
+            "family at matched data and compute, preserving the identical-prompt negative control and "
+            "frozen analysis."
+        ),
         "",
         "## 13. Git state",
         "",
@@ -351,11 +462,14 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         "",
     ]
     report_text = "\n".join(lines)
-    report_path = run_dir / "REPORT.md"
+    root_report_name = scientific_report_name(config)
+    report_name = root_report_name or "REPORT_DEVELOPMENT.md"
+    report_path = run_dir / report_name
     report_path.write_text(report_text, encoding="utf-8")
-    (repo_root / "REPORT.md").write_text(
-        _root_report_text(report_text, config.run_id), encoding="utf-8"
-    )
+    if root_report_name is not None:
+        (repo_root / root_report_name).write_text(
+            _root_report_text(report_text, config.run_id), encoding="utf-8"
+        )
     manifest = {
         "schema_version": "gct-report-v1",
         "status": "complete",

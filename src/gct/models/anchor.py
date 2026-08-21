@@ -1,35 +1,21 @@
-"""Common chat-template anchor tokenization."""
+"""Common final-anchor positioning and adapter-aware batch tokenization."""
 
 from __future__ import annotations
 
-from typing import Any
-
 import torch
-from transformers import PreTrainedTokenizerBase
+from transformers.tokenization_utils_base import PreTrainedTokenizerBase
 
-from gct.data.prompts import PromptRenderer
-
-
-def chat_text(tokenizer: PreTrainedTokenizerBase, prompt: str) -> str:
-    rendered = tokenizer.apply_chat_template(
-        PromptRenderer.chat_messages(prompt),
-        tokenize=False,
-        add_generation_prompt=True,
-        enable_thinking=False,
-    )
-    if not isinstance(rendered, str):
-        raise TypeError("chat template did not return text")
-    return rendered
+from gct.config import ExperimentConfig
+from gct.models.adapters import TokenizationPurpose, tokenize_for_model
 
 
 def tokenize_batch(
-    tokenizer: PreTrainedTokenizerBase, prompts: list[str], device: str
+    tokenizer: PreTrainedTokenizerBase,
+    prompts: list[str],
+    config: ExperimentConfig,
+    purpose: TokenizationPurpose,
 ) -> dict[str, torch.Tensor]:
-    texts = [chat_text(tokenizer, prompt) for prompt in prompts]
-    encoded: Any = tokenizer(texts, padding=True, return_tensors="pt", add_special_tokens=False)
-    return {
-        key: value.to(device) for key, value in encoded.items() if isinstance(value, torch.Tensor)
-    }
+    return tokenize_for_model(tokenizer, prompts, config, purpose)
 
 
 def anchor_positions(attention_mask: torch.Tensor) -> torch.Tensor:

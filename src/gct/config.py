@@ -33,6 +33,39 @@ class ModelConfig(StrictModel):
     deterministic_decoding: bool = True
     duplicate_prompt_policy: Literal["canonical_first_occurrence"] = "canonical_first_occurrence"
     max_new_tokens: int = Field(default=32, ge=1, le=512)
+    adapter_protocol: Literal["phi4mini-v2"] | None = None
+
+
+class DatasetConfig(StrictModel):
+    reuse_exact_baseline: bool = False
+    source_run: Path | None = None
+    expected_logical_hash: str | None = None
+    expected_rows: int | None = Field(default=None, ge=1)
+    expected_base_worlds: int | None = Field(default=None, ge=1)
+    expected_splits: dict[str, int] | None = None
+
+    @model_validator(mode="after")
+    def validate_reuse(self) -> DatasetConfig:
+        fields = (
+            self.source_run,
+            self.expected_logical_hash,
+            self.expected_rows,
+            self.expected_base_worlds,
+            self.expected_splits,
+        )
+        if self.reuse_exact_baseline and any(value is None for value in fields):
+            raise ValueError(
+                "exact dataset reuse requires source, hash, row/group, and split targets"
+            )
+        if not self.reuse_exact_baseline and any(value is not None for value in fields):
+            raise ValueError("dataset reuse metadata requires reuse_exact_baseline=true")
+        if self.expected_splits is not None and set(self.expected_splits) != {
+            "train",
+            "validation",
+            "test",
+        }:
+            raise ValueError("expected_splits must define train, validation, and test")
+        return self
 
 
 class HardwareConfig(StrictModel):
@@ -201,6 +234,7 @@ class PreregisteredHypothesis(StrictModel):
 class ExperimentConfig(StrictModel):
     project: ProjectConfig
     model: ModelConfig
+    dataset: DatasetConfig = DatasetConfig()
     hardware: HardwareConfig = HardwareConfig()
     world: WorldConfig
     splits: SplitsConfig
@@ -230,10 +264,33 @@ class ExperimentConfig(StrictModel):
             raise ValueError("preregistration must encode H1 through H8")
         if self.activations.save_full_sequence:
             raise ValueError("full-sequence extraction is outside the confirmatory v0 protocol")
+        phi_name = "microsoft/Phi-4-mini-instruct"
+        phi_revision = "4b00ec8714b0cb224e4fb33380cbf0919f177f3e"
+        if self.model.trust_remote_code and not (
+            self.model.name == phi_name and self.model.revision == phi_revision
+        ):
+            raise ValueError("trust_remote_code is allowed only for the pinned Phi-4-mini revision")
+        if self.model.name == phi_name:
+            if self.model.revision != phi_revision:
+                raise ValueError("Phi-4-mini must use the preregistered immutable revision")
+            if not self.model.trust_remote_code:
+                raise ValueError("the pinned Phi-4-mini adapter requires trust_remote_code=true")
+            if self.model.dtype != "bfloat16" or self.model.quantization != "none":
+                raise ValueError("Phi-4-mini confirmatory inference requires unquantized BF16")
+            if self.model.adapter_protocol != "phi4mini-v2":
+                raise ValueError("Phi-4-mini requires the versioned phi4mini-v2 adapter protocol")
+            if self.reporting.scientific_claims_allowed and not self.dataset.reuse_exact_baseline:
+                raise ValueError("scientific Model #2 runs must reuse the exact baseline dataset")
         return self
 
     def canonical_json(self) -> str:
         payload = self.model_dump(mode="json")
+        # This field postdates v0.1. Omitting its inert default preserves the exact
+        # canonical hashes of saved Model #1 configs and therefore their run IDs.
+        if not self.dataset.reuse_exact_baseline:
+            payload.pop("dataset", None)
+        if self.model.adapter_protocol is None:
+            payload["model"].pop("adapter_protocol", None)
         return json.dumps(payload, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
 
     @property
@@ -262,4 +319,8 @@ def load_config(path: str | Path) -> ExperimentConfig:
 def write_config_snapshot(config: ExperimentConfig, destination: Path) -> None:
     destination.parent.mkdir(parents=True, exist_ok=True)
     payload = config.model_dump(mode="json")
+    if not config.dataset.reuse_exact_baseline:
+        payload.pop("dataset", None)
+    if config.model.adapter_protocol is None:
+        payload["model"].pop("adapter_protocol", None)
     destination.write_text(yaml.safe_dump(payload, sort_keys=True), encoding="utf-8")

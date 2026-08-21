@@ -5,10 +5,13 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from gct.metrics.distances import MetricSpace
 from gct.operators.affine import AffineRidgeTransport
 from gct.operators.baselines import IdentityTransport, MeanShiftTransport
+from gct.operators.fit import _metric_space_arrays
 from gct.operators.generator import ContinuousGeneratorTransport
 from gct.operators.low_rank import LowRankResidualTransport, fit_rank_candidates
+from gct.preprocessing.pca import PCASpace
 
 
 def paired(seed: int = 7) -> tuple[np.ndarray, np.ndarray]:
@@ -86,3 +89,17 @@ def test_generator_rejects_zero_delta() -> None:
     source, target = paired()
     with pytest.raises(ValueError, match="nonzero"):
         ContinuousGeneratorTransport(4).fit_with_deltas(source, target, np.zeros(len(source)))
+
+
+def test_metric_space_safetensor_arrays_are_contiguous() -> None:
+    rng = np.random.default_rng(91)
+    space = MetricSpace.fit(rng.normal(size=(12, 6)), pca_dimension=4)
+    space = MetricSpace(
+        space.standardizer,
+        PCASpace(
+            space.pca.mean,
+            np.asfortranarray(space.pca.components),
+            space.pca.explained_variance,
+        ),
+    )
+    assert all(tensor.is_contiguous() for tensor in _metric_space_arrays(space).values())

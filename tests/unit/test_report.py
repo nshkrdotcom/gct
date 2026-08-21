@@ -1,6 +1,6 @@
 from typing import Any
 
-from gct.reporting.report import _interpretation_level, _root_report_text
+from gct.reporting.report import _hypothesis_line, _interpretation_level, _root_report_text
 
 
 def _hypotheses() -> dict[str, dict[str, Any]]:
@@ -43,3 +43,16 @@ def test_root_report_links_resolve_into_the_run_directory() -> None:
         "`runs/gct-v0.1-example/metrics/a.parquet` "
         "`runs/gct-v0.1-example/statistics/b.json`"
     )
+
+
+def test_h7_report_is_explicit_when_behavior_is_unparseable() -> None:
+    line = _hypothesis_line(
+        "H7",
+        {
+            "title": "Informative base lift",
+            "status": "not_supported",
+            "structural_gain": {"irrelevant_q": {"estimate": 0.1}},
+            "behavioral_gain": {"status": "inconclusive_due_to_parse_failures"},
+        },
+    )
+    assert "inconclusive_due_to_parse_failures" in line

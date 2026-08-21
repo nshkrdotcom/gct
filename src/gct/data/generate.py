@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import math
+import shutil
 from collections.abc import Iterable
 from pathlib import Path
 from typing import Any, cast
@@ -18,7 +19,7 @@ from gct.data.split import assert_grouped_splits
 from gct.data.transforms import Transform, commuting_square
 from gct.provenance import initialize_run, update_run_manifest
 from gct.storage.hashes import canonical_hash, file_hash
-from gct.storage.manifests import artifact_record, write_json_atomic
+from gct.storage.manifests import artifact_record, read_json, write_json_atomic
 from gct.worlds.toythermo import State, ToyThermo
 
 
@@ -386,6 +387,8 @@ def build_dataset(config: ExperimentConfig, repo_root: Path) -> Path:
     run_dir = initialize_run(config, repo_root)
     dataset_dir = run_dir / "dataset"
     dataset_dir.mkdir(parents=True, exist_ok=True)
+    if config.dataset.reuse_exact_baseline:
+        return _reuse_exact_dataset(config, repo_root, run_dir)
     rows = generate_rows(config)
     frame = pd.DataFrame([row.model_dump(mode="python") for row in rows], columns=DATASET_COLUMNS)
     validate_dataset_frame(frame, config)
@@ -420,6 +423,76 @@ def build_dataset(config: ExperimentConfig, repo_root: Path) -> Path:
     }
     write_json_atomic(dataset_dir / "manifest.json", manifest)
     update_run_manifest(run_dir, dataset_hash=logical_hash, status="dataset_complete")
+    return run_dir
+
+
+def _resolve_source_run(config: ExperimentConfig, repo_root: Path) -> Path:
+    source = config.dataset.source_run
+    if source is None:
+        raise ValueError("exact dataset reuse has no source run")
+    return source.resolve() if source.is_absolute() else (repo_root / source).resolve()
+
+
+def _reuse_exact_dataset(
+    config: ExperimentConfig,
+    repo_root: Path,
+    run_dir: Path,
+) -> Path:
+    source_run = _resolve_source_run(config, repo_root)
+    if source_run == run_dir.resolve():
+        raise ValueError("dataset source run cannot be the destination run")
+    source_result = validate_dataset_path(source_run)
+    expected_hash = config.dataset.expected_logical_hash
+    if source_result["logical_dataset_hash"] != expected_hash:
+        raise ValueError("baseline dataset logical hash differs from the frozen Model #2 target")
+    source_manifest_path = source_run / "dataset" / "manifest.json"
+    source_manifest = read_json(source_manifest_path)
+    source_data = source_run / "dataset" / "samples.parquet"
+    destination = run_dir / "dataset" / "samples.parquet"
+    shutil.copy2(source_data, destination)
+    if file_hash(destination) != file_hash(source_data):
+        raise RuntimeError("run-local Model #2 dataset copy differs from its immutable source")
+    frame = pd.read_parquet(destination)
+    result = validate_dataset_frame(frame, config)
+    rows = _validated_records(frame)
+    logical_hash = logical_dataset_hash(rows)
+    split_counts = {str(key): int(value) for key, value in frame.groupby("split").size().items()}
+    expected_splits = config.dataset.expected_splits
+    if (
+        logical_hash != expected_hash
+        or len(frame) != config.dataset.expected_rows
+        or int(frame["base_world_id"].nunique()) != config.dataset.expected_base_worlds
+        or split_counts != expected_splits
+    ):
+        raise ValueError("reused dataset does not match frozen Model #2 counts/hash/splits")
+    counts = cast(dict[str, Any], source_manifest["counts"])
+    manifest = {
+        "schema_version": "gct-dataset-v1-reused",
+        "config_hash": config.config_hash,
+        "world_version": config.world.version,
+        "seed": config.project.seed,
+        "logical_dataset_hash": logical_hash,
+        "parquet_sha256": file_hash(destination),
+        "counts": counts,
+        "artifact": artifact_record(destination, run_dir, "dataset_parquet_exact_baseline_copy"),
+        "source": {
+            "run_id": source_run.name,
+            "path": str(source_run),
+            "manifest_sha256": file_hash(source_manifest_path),
+            "parquet_sha256": file_hash(source_data),
+            "logical_dataset_hash": source_manifest["logical_dataset_hash"],
+            "copy_byte_identical": True,
+            "stable_ids_verified": True,
+        },
+        "validation": result,
+    }
+    write_json_atomic(run_dir / "dataset" / "manifest.json", manifest)
+    update_run_manifest(
+        run_dir,
+        dataset_hash=logical_hash,
+        dataset_source=manifest["source"],
+        status="dataset_complete",
+    )
     return run_dir
 
 
@@ -564,5 +637,21 @@ def validate_dataset_path(run_dir: Path) -> dict[str, Any]:
     actual_logical = logical_dataset_hash(rows)
     if actual_logical != manifest.get("logical_dataset_hash"):
         raise ValueError("dataset logical hash mismatch")
+    if config.dataset.reuse_exact_baseline:
+        if actual_logical != config.dataset.expected_logical_hash:
+            raise ValueError("reused dataset differs from configured logical hash")
+        expected_splits = config.dataset.expected_splits
+        actual_splits = {
+            str(key): int(value) for key, value in frame.groupby("split").size().items()
+        }
+        if (
+            len(frame) != config.dataset.expected_rows
+            or int(frame["base_world_id"].nunique()) != config.dataset.expected_base_worlds
+            or actual_splits != expected_splits
+        ):
+            raise ValueError("reused dataset differs from configured counts or split assignment")
+        source = manifest.get("source")
+        if not isinstance(source, dict) or source.get("copy_byte_identical") is not True:
+            raise ValueError("reused dataset lacks an exact-copy source certificate")
     result["logical_dataset_hash"] = actual_logical
     return result

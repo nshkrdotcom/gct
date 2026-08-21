@@ -38,11 +38,15 @@ def _available_layers(run_dir: Path) -> list[int]:
 
 def _metric_space_arrays(space: MetricSpace) -> dict[str, torch.Tensor]:
     return {
-        "standard_mean": torch.from_numpy(space.standardizer.mean.astype(np.float32)),
-        "standard_scale": torch.from_numpy(space.standardizer.scale.astype(np.float32)),
-        "pca_mean": torch.from_numpy(space.pca.mean.astype(np.float32)),
-        "pca_components": torch.from_numpy(space.pca.components.astype(np.float32)),
-        "pca_variance": torch.from_numpy(space.pca.explained_variance.astype(np.float32)),
+        "standard_mean": torch.from_numpy(space.standardizer.mean.astype(np.float32)).contiguous(),
+        "standard_scale": torch.from_numpy(
+            space.standardizer.scale.astype(np.float32)
+        ).contiguous(),
+        "pca_mean": torch.from_numpy(space.pca.mean.astype(np.float32)).contiguous(),
+        "pca_components": torch.from_numpy(space.pca.components.astype(np.float32)).contiguous(),
+        "pca_variance": torch.from_numpy(
+            space.pca.explained_variance.astype(np.float32)
+        ).contiguous(),
     }
 
 
@@ -129,6 +133,10 @@ def fit_transport_operators(config: ExperimentConfig, repo_root: Path) -> Path:
         raise ValueError("complete activation artifacts are required")
     if activation_manifest.get("config_hash") != config.config_hash:
         raise ValueError("activation manifest config differs from operator config")
+    if config.model.name == "microsoft/Phi-4-mini-instruct":
+        duplicate_audit = read_json(run_dir / "duplicate_audit.json")
+        if duplicate_audit.get("status") != "complete":
+            raise ValueError("exact post-canonicalization duplicate audit is required")
     output_dir = run_dir / "operators"
     output_dir.mkdir(parents=True, exist_ok=True)
     scan = _candidate_scan(config, run_dir)
