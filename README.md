@@ -75,6 +75,17 @@ coordinate decodability. H7/H8 remained unsupported, so the result is not eviden
 ontology, or universal truth geometry. The H6 identical-prompt arm passed in both families, but it
 is degenerate by construction and could not have failed; see `docs/LIMITATIONS.md`.
 
+One exploratory, non-confirmatory post-hoc analysis is recorded alongside those results. It fits the
+hidden pressure from the numeric literals the prompt already prints, with no model and no
+activations, to give the H5 residual R² a reference point:
+
+```bash
+uv run gct probes baseline --run gct-v0.1-db5a41461117
+```
+
+It writes only under `runs/<run-id>/exploratory/` and changes no endpoint status. Its numbers and
+their reading are in [EXPLORATORY_SURFACE_BASELINE.md](docs/EXPLORATORY_SURFACE_BASELINE.md).
+
 ## Quality gates
 
 ```bash

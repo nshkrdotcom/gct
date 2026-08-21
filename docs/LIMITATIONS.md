@@ -16,6 +16,17 @@
   alongside it adds nothing to that reading; see the identical-prompt entry below.
 - Explicit P and inferable R differ in computational accessibility as well as base coordinates. The Q
   arm controls added prompt capacity, but not every possible cognitive-load confound.
+- **The inferable arm prints R, and P is decodable from R alone without a model.** An exploratory
+  post-hoc baseline fits P from the numeric literals rendered into the prompt, on the same held-out
+  rows and with the residual probe's estimator, null, and bootstrap. It reaches R² 0.8874
+  (95% CI [0.8618, 0.9105]; MAE 0.1700; permutation p 0.000999) in the primary inferable arm,
+  against the supporting residual probe's R² 0.2878 and MAE 0.4573. The quantity H5 recovers is
+  therefore arithmetic on a number written in the input rather than hidden information, and H5 is
+  materially weaker than it reads: it is not evidence that the model inferred and represented an
+  otherwise inaccessible coordinate. That baseline is exploratory and non-confirmatory; it changes
+  no endpoint status, and it does not establish that the residual carries nothing beyond the
+  printed reading, which would need a conditional test that was not run. See
+  `EXPLORATORY_SURFACE_BASELINE.md`.
 - Familiar chemical names can activate pretrained priors despite explicit override text. That is the
   purpose of the stress test, not proof that the aliases are neutral.
 - Finite base worlds, grouped bootstrap replicates, and permutation replicates limit interval and
