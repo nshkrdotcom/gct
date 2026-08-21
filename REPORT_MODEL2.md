@@ -2,7 +2,7 @@
 
 ## 1. Executive result
 
-This report is generated from run `gct-v0.2-phi4mini-7a87777ac843` and recorded artifact hashes. The validation-selected transformer layer was 13; test data were evaluated only after the selection artifact was frozen. The run tested all five coordinate/control arms and both arbitrary and familiar-label versions. Across H1–H8, the status counts were {'not_supported': 6, 'supported': 1, 'control_pass': 1}. The conservative interpretation is Level 1 of 6. The broad v0 transport null replicates across a second model family, while H5 shows a control-safe family difference in residual decodability. This is evidence about empirical transport proxies in one synthetic task and one model, not evidence that coherence proves truth or that the model literally contains a sheaf, bifibration, or universal truth manifold.
+This report is generated from run `gct-v0.2-phi4mini-7a87777ac843` and recorded artifact hashes. The validation-selected transformer layer was 13; test data were evaluated only after the selection artifact was frozen. The run tested all five coordinate/control arms and both arbitrary and familiar-label versions. Across H1–H8, the status counts were {'not_supported': 6, 'supported': 1, 'control_pass': 1}. The conservative interpretation is Level 1 of 6. The broad v0 transport null replicates across a second model family, while H5 shows a family difference in residual decodability. This is evidence about empirical transport proxies in one synthetic task and one model, not evidence that coherence proves truth or that the model literally contains a sheaf, bifibration, or universal truth manifold.
 
 ## 2. Environment
 
@@ -17,7 +17,7 @@ This report is generated from run `gct-v0.2-phi4mini-7a87777ac843` and recorded 
 - Layers/hidden size: 32 / 3072
 - Runtime-discovered parameters/checkpoint bytes: `3836021760` / `7672066216`
 - Hashed checkpoint/config/tokenizer/code files: `23`
-- Repository commit at report build: `4742559aab9f82d01d7aa43b00f832559dd4ebbc`
+- Repository commit at report build: `9a6c5ab172fe82d41f4f34dc528f77fbf588f5fb`
 - Config hash: `7a87777ac8437e32b5adf586924a53914ca313aa2d061defccdd0f28c82687be`
 - Dependency lock hash: `f5d6ff10b891fbb7246e548626cbafe03b971b494abfb102e10f2fab8e0f051c`
 
@@ -86,7 +86,7 @@ Model #2 reused the Model #1 Parquet sample byte-for-byte from the immutable `gc
 | H7 | -0.06991 | not_supported | 0.1273 | not_supported |
 | H8 | — | not_supported | — | not_supported |
 
-H1 is wrong-sign in both families and H2/H3/H4/H7/H8 remain unsupported. H5 is the sole status divergence: Phi supports residual hidden-pressure decoding while Qwen does not; H6 passes for both. The paired confidence intervals and behavior/resource contrasts are in `REPORT_CROSS_MODEL.md`.
+H1 is wrong-sign in both families and H2/H3/H4/H7/H8 remain unsupported. H5 is the sole status divergence: Phi supports residual hidden-pressure decoding while Qwen does not. H6 is bit-identical in both families because its arm has a zero residual by construction, so it neither supports nor qualifies that divergence. The paired confidence intervals and behavior/resource contrasts are in `REPORT_CROSS_MODEL.md`.
 
 Effect signs were fixed in advance: H1 is nuisance minus substantive displacement (support requires a wholly negative interval); H2/H3 are one minus candidate-to-baseline defect ratios (positive favors learned transport); H4 prediction-error gain is confounds-only error minus confounds-plus-defect error; and H7 gains are inferable-arm loss minus lifted-arm loss (positive favors the lift). Thus the negative H2/H3/H4/H7 values are evidence against, not for, their hypotheses. H3's near-zero operator-composition defect does not rescue its substantially worse prediction to observed targets.
 
@@ -111,7 +111,7 @@ Across every preregistered lambda from 0 to 1, the MDL proxy's minimum was the b
 
 ## 8. Negative controls
 
-The identical-prompt unobservable control status was `control_pass` (test R² -0.03577; null 95th percentile -0.03577). H7's explicit-P structural gain was 0.1273, versus 0.05492 for irrelevant Q; the preregistered superiority rule was not met. In the familiar-label world, nested statuses were H2=`not_supported`, H5=`supported`, H6=`control_pass`, and H7=`not_supported`; the joint H8 gate remained unsupported. A failed H6 would invalidate positive hidden-coordinate interpretation until leakage was resolved.
+The identical-prompt unobservable control status was `control_pass` (test R² -0.03577; null 95th percentile -0.03577). That arm renders byte-identical prompts across the pressure shift, so its transport residual is identically zero, the fitted probe is intercept-only, and the endpoint reduces to a function of the shared labels. Its statistic is therefore invariant to model, layer, and prompt world, and is bit-identical across both completed families. It confirms that the probe cannot manufacture signal from a zero residual; it carries no information about leakage in the inferable arm, and no model could have made it fail. `gct verify` asserts the zero coefficient and zero residual variance directly, because that degeneracy — not the endpoint status — is what a prompt-rendering regression would break. H7's explicit-P structural gain was 0.1273, versus 0.05492 for irrelevant Q; the preregistered superiority rule was not met. In the familiar-label world, nested statuses were H2=`not_supported`, H5=`supported`, H6=`control_pass`, and H7=`not_supported`; the joint H8 gate remained unsupported. The renamed identical-prompt control is degenerate on the same construction as the primary one and is read the same way.
 
 Raw batched extraction showed numerical batch-boundary sensitivity in 34 of 2520 repeated activation rows (maximum stored difference 2); generation differed in 6 repeated rows. Because identical token sequences cannot contain a row-specific hidden coordinate, the preregistered `canonical_first_occurrence` policy rewrote each duplicate prompt from its first dataset occurrence before analysis. The final exact audit is recorded above. An earlier adapter-generation run with an incomplete EOS configuration was superseded before any full behavior shard or test metric existed.
 
@@ -133,7 +133,7 @@ The single most informative follow-up is a new v0.3 preregistration that changes
 
 ## 13. Git state
 
-- Commit at report build: `4742559aab9f82d01d7aa43b00f832559dd4ebbc`
+- Commit at report build: `9a6c5ab172fe82d41f4f34dc528f77fbf588f5fb`
 - Remote configured: `True` (`origin (n:nshkrdotcom/gct.git)`)
 - Push attempted: `True`
 - Push verified: `True` at `4742559aab9f82d01d7aa43b00f832559dd4ebbc`

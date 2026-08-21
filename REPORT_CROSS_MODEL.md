@@ -2,7 +2,7 @@
 
 ## Executive result
 
-Phi reproduces the broad Qwen v0 simple-state-transport null (H1 wrong-sign; H2/H3/H4/H7/H8 unsupported), while Phi alone supports H5 with H6 passing: model-family-dependent latent residual decodability without evidence that an explicit base lift uniquely repairs structure. Phi behavior remains near floor, limiting behavioral endpoints; no universal truth geometry, causal use, or ontology is established.
+Phi reproduces the broad Qwen v0 simple-state-transport null (H1 wrong-sign; H2/H3/H4/H7/H8 unsupported), while Phi alone supports H5: model-family-dependent latent residual decodability without evidence that an explicit base lift uniquely repairs structure. H6 is bit-identical in both families because its identical-prompt arm has a zero residual by construction, so it qualifies neither result. Phi behavior remains near floor, limiting behavioral endpoints; no universal truth geometry, causal use, or ontology is established.
 
 Both models used the exact same 12,600 stable sample IDs, 420 base-world groups, split assignments, prompts, controls, metrics, and H1–H8 rules. Endpoint decisions remain model-specific; the paired contrasts below are secondary and do not revise either preregistered decision.
 
@@ -21,7 +21,7 @@ Both models used the exact same 12,600 stable sample IDs, 420 base-world groups,
 
 H1 uses nuisance minus substantive displacement, so its wholly positive interval is opposite the preregistered theory in both models. H2/H3/H4/H7 positive effects favor the theory; negative values do not. H4's paired contrast uses the persisted grouped absolute-prediction-error gain. H5/H6 are persisted aggregate probe R² endpoints without per-row prediction artifacts, and H8 is a joint gate; their cross-model differences are therefore descriptive (`—`) rather than pseudo-paired.
 
-Phi's H5 result is the only endpoint-status divergence: inferable hidden-pressure residual decoding was supported with R² 0.2878 while Qwen's R² was −0.2140. H6 passed identically in both models. This supports family-dependent residual association/decodability, not causal use or ontology discovery. H7 and H8 failed, so the signal did not establish a uniquely useful explicit-coordinate lift or semantic-robust transport structure.
+Phi's H5 result is the only endpoint-status divergence: inferable hidden-pressure residual decoding was supported with R² 0.2878 while Qwen's R² was −0.2140. H6 is bit-identical in both models because its arm renders byte-identical prompts, so its residual is identically zero and its statistic depends on the shared labels alone; it is a pipeline check, not an independent leakage test that this divergence survived. This supports family-dependent residual association/decodability, not causal use or ontology discovery. H7 and H8 failed, so the signal did not establish a uniquely useful explicit-coordinate lift or semantic-robust transport structure.
 
 ## Behavior
 
@@ -67,7 +67,7 @@ Held-out low-rank candidate / validation-selected baseline defect ratios (<1 fav
 | standardized_l2 | 1.093 (identity) | 1.062 (mean_shift) |
 | whitened_l2 | 1.2 (identity) | 1.066 (mean_shift) |
 
-The cross-model paired endpoint contrasts use the frozen primary whitened metric. H5/H6 probe results, H7 explicit-versus-Q base lifts, and H8 renamed replication appear in the endpoint table and model-specific reports. The identical-prompt H6 control passed in both primary and renamed worlds, and the exact post-canonicalization duplicate audit found zero mismatches for Phi.
+The cross-model paired endpoint contrasts use the frozen primary whitened metric. H5/H6 probe results, H7 explicit-versus-Q base lifts, and H8 renamed replication appear in the endpoint table and model-specific reports. The identical-prompt control is degenerate by construction in both primary and renamed worlds — zero residual, intercept-only probe, an endpoint invariant to model and layer — so its agreement across families is arithmetic rather than evidential. The exact post-canonicalization duplicate audit found zero mismatches for Phi, and `gct verify` asserts the stored control probes are exactly degenerate.
 
 ## Figures
 
@@ -81,7 +81,7 @@ The cross-model paired endpoint contrasts use the frozen primary whitened metric
 
 ## Interpretation matrix
 
-The applicable frozen matrix rows are: (1) H1 wrong-sign with H2+ null, a broad second-family replication of the simple v0 state-transport null; (2) H5 positive with H6 passing and H7 failing, latent residual decodability without evidence that explicit base lift uniquely repairs structure; and (3) Phi behavior near floor, which limits behavioral endpoints but does not license prompt redesign or remove representational tests.
+The applicable frozen matrix rows are: (1) H1 wrong-sign with H2+ null, a broad second-family replication of the simple v0 state-transport null; (2) H5 positive with H7 failing, latent residual decodability without evidence that explicit base lift uniquely repairs structure; and (3) Phi behavior near floor, which limits behavioral endpoints but does not license prompt redesign or remove representational tests. The frozen matrix names H6 alongside that second row, but H6 could not have failed and adds no support to it.
 
 The result does not disprove GCT broadly, prove universal truth geometry, or show causal use. A future v0.3 would require a new preregistration before testing a changed representational object such as trajectories, nonlinear local transports, circuits, Jacobians, or interventions.
 

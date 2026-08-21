@@ -114,8 +114,8 @@ def _endpoint_comparisons(
         "H2": "broad reusable-transport null",
         "H3": "target-predictive continuous transport unsupported",
         "H4": "structural defects do not improve behavioral prediction",
-        "H5": "family-dependent residual decodability with control pass",
-        "H6": "negative-control validity preserved",
+        "H5": "family-dependent residual decodability",
+        "H6": "degenerate identical-prompt pipeline check, invariant by construction",
         "H7": "no uniquely useful explicit base lift",
         "H8": "semantic-renaming joint gate unsupported",
     }
@@ -569,7 +569,7 @@ def _report_text(summary: dict[str, Any], figure_paths: list[str]) -> str:
             "",
             "H1 uses nuisance minus substantive displacement, so its wholly positive interval is opposite the preregistered theory in both models. H2/H3/H4/H7 positive effects favor the theory; negative values do not. H4's paired contrast uses the persisted grouped absolute-prediction-error gain. H5/H6 are persisted aggregate probe R² endpoints without per-row prediction artifacts, and H8 is a joint gate; their cross-model differences are therefore descriptive (`—`) rather than pseudo-paired.",
             "",
-            "Phi's H5 result is the only endpoint-status divergence: inferable hidden-pressure residual decoding was supported with R² 0.2878 while Qwen's R² was −0.2140. H6 passed identically in both models. This supports family-dependent residual association/decodability, not causal use or ontology discovery. H7 and H8 failed, so the signal did not establish a uniquely useful explicit-coordinate lift or semantic-robust transport structure.",
+            "Phi's H5 result is the only endpoint-status divergence: inferable hidden-pressure residual decoding was supported with R² 0.2878 while Qwen's R² was −0.2140. H6 is bit-identical in both models because its arm renders byte-identical prompts, so its residual is identically zero and its statistic depends on the shared labels alone; it is a pipeline check, not an independent leakage test that this divergence survived. This supports family-dependent residual association/decodability, not causal use or ontology discovery. H7 and H8 failed, so the signal did not establish a uniquely useful explicit-coordinate lift or semantic-robust transport structure.",
             "",
             "## Behavior",
             "",
@@ -635,7 +635,7 @@ def _report_text(summary: dict[str, Any], figure_paths: list[str]) -> str:
     lines.extend(
         [
             "",
-            "The cross-model paired endpoint contrasts use the frozen primary whitened metric. H5/H6 probe results, H7 explicit-versus-Q base lifts, and H8 renamed replication appear in the endpoint table and model-specific reports. The identical-prompt H6 control passed in both primary and renamed worlds, and the exact post-canonicalization duplicate audit found zero mismatches for Phi.",
+            "The cross-model paired endpoint contrasts use the frozen primary whitened metric. H5/H6 probe results, H7 explicit-versus-Q base lifts, and H8 renamed replication appear in the endpoint table and model-specific reports. The identical-prompt control is degenerate by construction in both primary and renamed worlds — zero residual, intercept-only probe, an endpoint invariant to model and layer — so its agreement across families is arithmetic rather than evidential. The exact post-canonicalization duplicate audit found zero mismatches for Phi, and `gct verify` asserts the stored control probes are exactly degenerate.",
             "",
             "## Figures",
             "",
@@ -643,7 +643,7 @@ def _report_text(summary: dict[str, Any], figure_paths: list[str]) -> str:
             "",
             "## Interpretation matrix",
             "",
-            "The applicable frozen matrix rows are: (1) H1 wrong-sign with H2+ null, a broad second-family replication of the simple v0 state-transport null; (2) H5 positive with H6 passing and H7 failing, latent residual decodability without evidence that explicit base lift uniquely repairs structure; and (3) Phi behavior near floor, which limits behavioral endpoints but does not license prompt redesign or remove representational tests.",
+            "The applicable frozen matrix rows are: (1) H1 wrong-sign with H2+ null, a broad second-family replication of the simple v0 state-transport null; (2) H5 positive with H7 failing, latent residual decodability without evidence that explicit base lift uniquely repairs structure; and (3) Phi behavior near floor, which limits behavioral endpoints but does not license prompt redesign or remove representational tests. The frozen matrix names H6 alongside that second row, but H6 could not have failed and adds no support to it.",
             "",
             "The result does not disprove GCT broadly, prove universal truth geometry, or show causal use. A future v0.3 would require a new preregistration before testing a changed representational object such as trajectories, nonlinear local transports, circuits, Jacobians, or interventions.",
             "",
@@ -698,10 +698,12 @@ def build_cross_model_report(
         "negative_controls_valid": True,
         "interpretation": (
             "Phi reproduces the broad Qwen v0 simple-state-transport null (H1 wrong-sign; "
-            "H2/H3/H4/H7/H8 unsupported), while Phi alone supports H5 with H6 passing: "
-            "model-family-dependent latent residual decodability without evidence that an explicit "
-            "base lift uniquely repairs structure. Phi behavior remains near floor, limiting "
-            "behavioral endpoints; no universal truth geometry, causal use, or ontology is established."
+            "H2/H3/H4/H7/H8 unsupported), while Phi alone supports H5: model-family-dependent "
+            "latent residual decodability without evidence that an explicit base lift uniquely "
+            "repairs structure. H6 is bit-identical in both families because its identical-prompt "
+            "arm has a zero residual by construction, so it qualifies neither result. Phi behavior "
+            "remains near floor, limiting behavioral endpoints; no universal truth geometry, "
+            "causal use, or ontology is established."
         ),
     }
     schema_path = repo_root / "spec" / "model2_cross_model_schema.json"

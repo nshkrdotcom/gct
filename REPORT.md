@@ -12,9 +12,12 @@ This report is generated from run `gct-v0.1-db5a41461117` and recorded artifact 
 - NVIDIA driver / PyTorch CUDA runtime: `610.88` / `13.0`
 - PyTorch: `2.12.0+cu130`
 - Model: `Qwen/Qwen3-4B` at revision `1cfa9a7208912126459214e8b04321603b3df60c`
+- Model adapter protocol / remote code: `None` / `False` (immutable revision only)
 - Dtype/storage: `bfloat16` / `float16`
 - Layers/hidden size: 36 / 2560
-- Repository commit at report build: `62eaf2be781361694530f8d5d98e366bf87182ad`
+- Runtime-discovered parameters/checkpoint bytes: `None` / `None`
+- Hashed checkpoint/config/tokenizer/code files: `0`
+- Repository commit at report build: `9a6c5ab172fe82d41f4f34dc528f77fbf588f5fb`
 - Config hash: `db5a414611170ba43e29ab33a3e2a614056b423ef072ab8e594f038a0c231018`
 - Dependency lock hash: `a2b3ea8d47104ad3ecabb28b77c58305847059e5776e4550a287298834c5b6b0`
 
@@ -64,14 +67,14 @@ The dataset contains 12600 prompt rows from 420 grouped base worlds. Split count
 | H4 | Structural defects predict behavior | not_supported | R² gain=-0.08419; prediction-error gain=-0.3428 [95% CI -0.4536, -0.228] |
 | H5 | Inferable omitted coordinate in residuals | not_supported | test R²=-0.214; MAE=0.5545; permutation p=0.5634; R² 95% CI [-0.5605, 0.02679] |
 | H6 | Unobservable-coordinate negative control | control_pass | test R²=-0.03577; MAE=0.539; permutation p=0.8472; R² 95% CI [-0.1559, -0.0005554] |
-| H7 | Informative base lift | not_supported | effect=-0.06991; 95% CI [-0.08709, -0.05283]; Q structural=-0.03184; explicit behavior=3.359; Q behavior=2.262 |
+| H7 | Informative base lift | not_supported | effect=-0.06991; 95% CI [-0.08709, -0.05283]; Q structural=-0.03184; behavior=explicit=3.359 [95% CI 2.349, 4.4]; Q=2.262 [95% CI 1.339, 3.198] |
 | H8 | Semantic-renaming robustness | not_supported | renamed statuses=H2:not_supported, H5:not_supported, H6:control_pass, H7:not_supported; renamed H2 effect=-0.1252; H5 R²=-0.06671, p=0.04695; H6 R²=-0.03577, p=0.8561; H7 structural effect=-0.02544 |
 
 Effect signs were fixed in advance: H1 is nuisance minus substantive displacement (support requires a wholly negative interval); H2/H3 are one minus candidate-to-baseline defect ratios (positive favors learned transport); H4 prediction-error gain is confounds-only error minus confounds-plus-defect error; and H7 gains are inferable-arm loss minus lifted-arm loss (positive favors the lift). Thus the negative H2/H3/H4/H7 values are evidence against, not for, their hypotheses. H3's near-zero operator-composition defect does not rescue its substantially worse prediction to observed targets.
 
-For H7, the explicit-P structural 95% CI was [-0.08709, -0.05283], versus [-0.04721, -0.01794] for Q. Behavioral gains were 3.359 [2.349, 4.4] for explicit P and 2.262 [1.339, 3.198] for Q; the preregistered non-overlap/superiority rule failed.
+For H7, the explicit-P structural 95% CI was [-0.08709, -0.05283], versus [-0.04721, -0.01794] for Q. Behavioral gains were explicit=3.359 [95% CI 2.349, 4.4]; Q=2.262 [95% CI 1.339, 3.198]; the preregistered non-overlap/superiority rule failed.
 
-For H8, renamed H2 had 95% CI [-0.2027, -0.0541]. Renamed H5's R² interval was [-0.3245, 0.1184]; despite p=0.04695, its negative point R² failed the joint decision rule. Renamed H7's explicit structural interval was [-0.05396, 0.003724], so replication remained unsupported.
+For H8, renamed H2 had 95% CI [-0.2027, -0.0541]. Renamed H5's R² interval was [-0.3245, 0.1184]; p=0.04695, with recorded status `not_supported`. Renamed H7's explicit structural interval was [-0.05396, 0.003724], so replication remained unsupported.
 
 The complete nested effects, null thresholds, behavior baselines, and H8 replication results are in `runs/gct-v0.1-db5a41461117/statistics/hypotheses.json`; no endpoint was removed because of its sign.
 
@@ -90,7 +93,7 @@ Across every preregistered lambda from 0 to 1, the MDL proxy's minimum was the b
 
 ## 8. Negative controls
 
-The identical-prompt unobservable control status was `control_pass` (test R² -0.03577; null 95th percentile -0.03577). H7's explicit-P structural gain was -0.06991, versus -0.03184 for irrelevant Q; the preregistered superiority rule was not met. In the familiar-label world, H2, H5, and H7 remained unsupported while H6 again passed. A failed H6 would invalidate positive hidden-coordinate interpretation until leakage was resolved.
+The identical-prompt unobservable control status was `control_pass` (test R² -0.03577; null 95th percentile -0.03577). That arm renders byte-identical prompts across the pressure shift, so its transport residual is identically zero, the fitted probe is intercept-only, and the endpoint reduces to a function of the shared labels. Its statistic is therefore invariant to model, layer, and prompt world, and is bit-identical across both completed families. It confirms that the probe cannot manufacture signal from a zero residual; it carries no information about leakage in the inferable arm, and no model could have made it fail. `gct verify` asserts the zero coefficient and zero residual variance directly, because that degeneracy — not the endpoint status — is what a prompt-rendering regression would break. H7's explicit-P structural gain was -0.06991, versus -0.03184 for irrelevant Q; the preregistered superiority rule was not met. In the familiar-label world, nested statuses were H2=`not_supported`, H5=`not_supported`, H6=`control_pass`, and H7=`not_supported`; the joint H8 gate remained unsupported. The renamed identical-prompt control is degenerate on the same construction as the primary one and is read the same way.
 
 Raw batched extraction showed numerical batch-boundary sensitivity in 34 of 2520 repeated activation rows (maximum stored difference 4); generation differed in 9 repeated rows. Because identical token sequences cannot contain a row-specific hidden coordinate, the preregistered `canonical_first_occurrence` policy rewrote each duplicate prompt from its first dataset occurrence before analysis. The final exact audit is recorded above. An earlier batch-sensitive run was superseded rather than reported.
 
@@ -104,7 +107,7 @@ The nearest work includes context-conditioned truth-vector geometry, transformat
 
 ## 11. Limitations
 
-One 4B instruction model, one anchor, a synthetic arithmetic world, linear/reduced-rank operators, representation-dependent distances, observational activations, finite permutation/bootstrap precision, and possible prompt-computation confounds limit inference. Familiar labels may invoke pretraining priors even though the prompt overrides chemistry. See `docs/LIMITATIONS.md`.
+One 4B instruction model, one anchor, and a synthetic arithmetic world; linear/reduced-rank operators, representation-dependent distances, observational activations, finite permutation/bootstrap precision, and possible prompt-computation confounds limit inference. Familiar labels may invoke pretraining priors even though the prompt overrides chemistry. See `docs/LIMITATIONS.md`.
 
 ## 12. Next experiment
 
@@ -112,7 +115,7 @@ The single most informative follow-up is a preregistered replication on a second
 
 ## 13. Git state
 
-- Commit at report build: `62eaf2be781361694530f8d5d98e366bf87182ad`
+- Commit at report build: `9a6c5ab172fe82d41f4f34dc528f77fbf588f5fb`
 - Remote configured: `True` (`origin (n:nshkrdotcom/gct.git)`)
 - Push attempted: `True`
 - Push verified: `True` at `62eaf2be781361694530f8d5d98e366bf87182ad`

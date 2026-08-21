@@ -177,8 +177,10 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
                 "",
                 "H1 is wrong-sign in both families and H2/H3/H4/H7/H8 remain unsupported. "
                 "H5 is the sole status divergence: Phi supports residual hidden-pressure decoding "
-                "while Qwen does not; H6 passes for both. The paired confidence intervals and "
-                "behavior/resource contrasts are in `REPORT_CROSS_MODEL.md`.",
+                "while Qwen does not. H6 is bit-identical in both families because its arm has a "
+                "zero residual by construction, so it neither supports nor qualifies that "
+                "divergence. The paired confidence intervals and behavior/resource contrasts are "
+                "in `REPORT_CROSS_MODEL.md`.",
             ]
         )
 
@@ -246,7 +248,7 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         f"The conservative interpretation is Level {level} of 6. "
         + (
             "The broad v0 transport null replicates across a second model family, while H5 shows a "
-            "control-safe family difference in residual decodability. "
+            "family difference in residual decodability. "
             if is_model2
             else ""
         )
@@ -389,15 +391,24 @@ def build_report(config: ExperimentConfig, repo_root: Path) -> Path:
         "",
         f"The identical-prompt unobservable control status was `{hypotheses['H6']['status']}` "
         f"(test R² {_fmt(hypotheses['H6']['test_r2'])}; null 95th percentile "
-        f"{_fmt(hypotheses['H6']['null_r2_95th_percentile'])}). H7's explicit-P structural gain was "
+        f"{_fmt(hypotheses['H6']['null_r2_95th_percentile'])}). That arm renders byte-identical "
+        "prompts across the pressure shift, so its transport residual is identically zero, the "
+        "fitted probe is intercept-only, and the endpoint reduces to a function of the shared "
+        "labels. Its statistic is therefore invariant to model, layer, and prompt world, and is "
+        "bit-identical across both completed families. It confirms that the probe cannot "
+        "manufacture signal from a zero residual; it carries no information about leakage in the "
+        "inferable arm, and no model could have made it fail. `gct verify` asserts the zero "
+        "coefficient and zero residual variance directly, because that degeneracy — not the "
+        "endpoint status — is what a prompt-rendering regression would break. "
+        f"H7's explicit-P structural gain was "
         f"{_fmt(hypotheses['H7']['structural_gain']['explicit']['estimate'])}, versus "
         f"{_fmt(hypotheses['H7']['structural_gain']['irrelevant_q']['estimate'])} for irrelevant Q; "
         "the preregistered superiority rule was not met. In the familiar-label world, nested "
         f"statuses were H2=`{hypotheses['H8']['H2']['status']}`, "
         f"H5=`{hypotheses['H8']['H5']['status']}`, H6=`{hypotheses['H8']['H6']['status']}`, and "
-        f"H7=`{hypotheses['H8']['H7']['status']}`; the joint H8 gate remained unsupported. "
-        "A failed H6 would invalidate positive "
-        "hidden-coordinate interpretation until leakage was resolved.",
+        f"H7=`{hypotheses['H8']['H7']['status']}`; the joint H8 gate remained unsupported. The "
+        "renamed identical-prompt control is degenerate on the same construction as the primary "
+        "one and is read the same way.",
         "",
         f"Raw batched extraction showed numerical batch-boundary sensitivity in "
         f"{activation_canonical['mismatched_rows_before_canonicalization']} of "
