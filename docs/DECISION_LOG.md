@@ -45,3 +45,23 @@
 - Pin Python 3.12 because the available Python 3.14 free-threaded interpreter lacked binary wheels for
   critical tensor dependencies. The package source remains Python 3.11+ compatible.
 - Use PyTorch 2.12.0+cu130 following current Blackwell guidance and record the full lock hash.
+- Add a shared model-adapter boundary for the frozen Model #2 replication. Phi uses its official chat
+  template and pinned remote code at revision `4b00ec8714b0cb224e4fb33380cbf0919f177f3e`;
+  Qwen behavior remains unchanged. Phi extraction appends literal `FINAL=` after the official assistant
+  header so behavior and activation use one prompt-invariant semantic answer anchor.
+- The pinned Phi remote code imports `LossKwargs`, which is exported by Transformers 4.53.3 but not by
+  the initially resolved 5.15.1 or tested 4.57.6 installs. Before any Model #2 output existed, constrain
+  Transformers to `>=4.51,<4.54` and lock 4.53.3. This is a model-adapter compatibility change, not a
+  scientific protocol change.
+- A pre-test generation audit found that the inherited single tokenizer-EOS override discarded Phi's
+  official two-token EOS list and allowed continuations after `<|end|>`. Before the first full behavior
+  shard and before any full test metric, version the corrected adapter as `phi4mini-v2`, preserve the
+  official EOS list, supersede the incomplete run identities, and restart under config hash
+  `7a87777ac8437e32b5adf586924a53914ca313aa2d061defccdd0f28c82687be`.
+- Cross-model endpoint differences use paired whole-base-world bootstrap only for persisted additive
+  group effects (H1–H4 and H7). H5/H6 have aggregate probe R² artifacts without persisted row-level
+  predictions and H8 is a joint gate, so their differences are descriptive rather than pseudo-paired.
+- The frozen Phi result is Level 1: H1 is distinguishable but wrong-sign; H2/H3/H4/H7/H8 are not
+  supported; H5 is supported; and H6 passes. The permitted interpretation is a broad second-family
+  simple-transport null plus family-dependent residual decodability without a uniquely useful base lift,
+  causal-use evidence, or universal ontology.

@@ -86,6 +86,10 @@ not a novelty claim.
 
 - [Qwen3-4B official model card](https://huggingface.co/Qwen/Qwen3-4B) and exact resolved config are
   recorded per run.
+- [Phi-4-mini-instruct official model card](https://huggingface.co/microsoft/Phi-4-mini-instruct),
+  immutable revision `4b00ec8714b0cb224e4fb33380cbf0919f177f3e`, and all downloaded
+  model/config/tokenizer/remote-code hashes are recorded in the Model #2 activation manifest. The
+  checkpoint is MIT-licensed; remote code is enabled only for the pinned revision.
 - [Hugging Face model output documentation](https://huggingface.co/docs/transformers/main_classes/output)
   defines embedding-plus-layer hidden-state tuples.
 - [PyTorch 2.7 release](https://pytorch.org/blog/pytorch-2-7/) introduced official Blackwell/CUDA 12.8

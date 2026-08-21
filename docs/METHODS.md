@@ -28,13 +28,17 @@ paraphrase, active/passive phrasing, clause order, formatting, persona framing, 
 a reversible field-label alias map. Derived rows never cross the `base_world_id` split. Cyrene is
 absent from train/validation base states in the full protocol and is marked as a secondary test subset.
 
-## Prompt anchor and model
+## Prompt anchor and model adapters
 
-The model is unquantized `Qwen/Qwen3-4B` BF16. Prompts use the checkpoint's official chat template,
-a fixed system message, `enable_thinking=False`, and a fixed assistant-generation anchor. Before
-extraction, representative rows from every coordinate/world/renderer combination must share the
-configured final token suffix. `hidden_states[0]` is saved as the embedding output; transformer layer
-`l` is explicitly read from `hidden_states[l+1]`.
+Model #1 is unquantized `Qwen/Qwen3-4B` BF16. Model #2 is unquantized
+`microsoft/Phi-4-mini-instruct` BF16 at immutable revision
+`4b00ec8714b0cb224e4fb33380cbf0919f177f3e`. A shared adapter boundary handles official chat
+templates, Qwen's `enable_thinking=False`, Phi's pinned `trust_remote_code=True`, assistant headers,
+official EOS IDs, and the fixed response prefill without changing semantic system/user content.
+Before extraction, every full-dataset prompt is audited for the configured invariant token suffix.
+`hidden_states[0]` is saved as the embedding output; transformer layer `l` is explicitly read from
+`hidden_states[l+1]`. Phi runtime discovery verified 32 layers, hidden size 3072, 24 attention heads,
+8 KV heads, BF16 parameters, and all embedding-plus-layer shapes.
 
 Only the final anchor vector is retained. Activation tensors are sharded safetensors with Parquet row
 indexes and SHA-256 hashes. Deterministic greedy answers are stored separately. Generation prefills
@@ -47,6 +51,12 @@ Identical prompt hashes are canonicalized to their first dataset occurrence afte
 generation. This removes rare BF16/SDPA batch-boundary variation as a hidden-label pathway. Manifests
 record how many raw mismatches were found and which shards were rewritten; per-row oracle errors are
 recomputed after response canonicalization.
+
+Model #2 reuses the exact Model #1 sample Parquet rather than a statistically equivalent regeneration.
+The copy, logical hash, stable IDs, group IDs, and split IDs are all verified before model inference.
+Cross-model analysis joins stable IDs and resamples whole paired base worlds; row order is never a key.
+Where no additive paired endpoint artifact exists (aggregate probe R² and the H8 joint gate), the
+cross-model difference is explicitly descriptive.
 
 ## Frozen analysis
 

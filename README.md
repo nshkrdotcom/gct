@@ -4,9 +4,11 @@ GCT is a reproducible experiment testing whether real language-model residual st
 reusable transport laws across controlled context transformations. The oracle is an axiomatic
 synthetic world; latent coherence is never treated as truth.
 
-The default target is unquantized `Qwen/Qwen3-4B` in BF16 on an NVIDIA RTX 5060 Ti 16 GB.
-Synthetic data are intentional experimental data. Reported activation results must come from the
-real checkpoint; the package contains no production fake backend.
+The original target is unquantized `Qwen/Qwen3-4B`; the completed second-family replication uses
+pinned `microsoft/Phi-4-mini-instruct` in BF16 on an NVIDIA RTX 5060 Ti 16 GB. Model #2 reuses the
+exact Model #1 scientific rows and frozen H1–H8 rules. Synthetic data are intentional experimental
+data. Reported activation results must come from real checkpoints; the package contains no
+production fake backend.
 
 ## Setup
 
@@ -35,6 +37,19 @@ The preregistered experiment is:
 uv run gct run --config configs/experiment_full.yaml --resume
 ```
 
+The completed Model #2 replication and paired comparison are reproduced with:
+
+```bash
+uv run gct run --config configs/experiment_model2_phi4mini_full.yaml --resume
+uv run gct compare models \
+  --baseline-run gct-v0.1-db5a41461117 \
+  --replication-run gct-v0.2-phi4mini-7a87777ac843
+uv run gct verify gct-v0.2-phi4mini-7a87777ac843
+```
+
+`configs/experiment_model2_phi4mini_ci.yaml` is an engineering-only configuration and is rejected
+as scientific evidence.
+
 Individual and audit commands follow the same immutable run resolution:
 
 ```bash
@@ -53,9 +68,11 @@ uv run gct verify runs/<run-id>
 ```
 
 See [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md), [METHODS.md](docs/METHODS.md), and the
-machine-readable preregistration in the full config. Generated evidence is summarized in
-`REPORT.md`; the report distinguishes the completed real-model run from engineering-only checks and
-states every negative result and limitation explicitly.
+machine-readable preregistration in the full config. Generated evidence is summarized in `REPORT.md`
+for Model #1, `REPORT_MODEL2.md` for Phi, and `REPORT_CROSS_MODEL.md` for the paired stable-ID/base-
+world comparison. The broad reusable-transport null replicated; Phi alone supported H5 residual-
+coordinate decodability while both H6 negative controls passed. H7/H8 remained unsupported, so the
+result is not evidence of causal use, ontology, or universal truth geometry.
 
 ## Quality gates
 
@@ -65,4 +82,5 @@ uv run ruff check .
 uv run ruff format --check .
 uv run mypy src/gct
 GCT_RUN_REAL_MODEL_TEST=1 uv run pytest -q tests/integration/test_real_qwen.py -m real_model
+GCT_RUN_REAL_MODEL_TEST=1 uv run pytest -q tests/integration/test_real_phi.py -m real_model
 ```

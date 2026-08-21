@@ -17,3 +17,19 @@ This checklist is updated from actual artifacts during final review. “Implemen
 - [x] Final tests, lint, format, mypy, deterministic regeneration, and artifact verification recorded.
 - [x] Final TODO/placeholder and test-contamination audit complete.
 - [x] Logical commits and verified remote push complete.
+
+## Model #2 replication
+
+- [x] Shared Qwen/Phi adapter boundary with immutable Phi revision and hashed remote-code sources.
+- [x] Official Phi template, invariant `FINAL=` suffix audit, embedding + 32-layer indexing, BF16 CUDA,
+  deterministic generation, and real-model integration test.
+- [x] Exact byte-identical Model #1 dataset reuse with logical hash/stable-ID/split equality checks.
+- [x] Distinct scientific/CI configs; CI artifacts cannot emit scientific root reports.
+- [x] Full 12,600-row Phi activation and behavior run, raw mismatch preservation, and exact
+  post-canonicalization audit.
+- [x] Validation-only layer/operator/probe selection frozen before test evaluation.
+- [x] All H1–H8 endpoints and controls evaluated; H6 mandatory and passing in primary/renamed worlds.
+- [x] Stable-ID/base-world paired cross-model analysis, seven required figures, and schema-validated JSON.
+- [x] Actual-evidence `REPORT_MODEL2.md` and `REPORT_CROSS_MODEL.md` generated.
+- [ ] Final Model #2 tests/lint/format/typecheck/real integration/hash/regeneration gates recorded.
+- [ ] Model #2 implementation/reports committed, pushed, remote-verified, and worktree clean.
