@@ -18,6 +18,7 @@ from gct.models.loader import runtime_report
 from gct.operators.fit import fit_transport_operators
 from gct.pipeline import run_pipeline
 from gct.probes.hidden_coordinate import fit_hidden_coordinate_probes
+from gct.probes.surface_baseline import fit_surface_baseline
 from gct.provenance import freeze_model2_preregistration
 from gct.reporting.cross_model import build_cross_model_report
 from gct.reporting.report import build_report
@@ -156,6 +157,24 @@ def probes_fit(config: ConfigOption) -> None:
     cfg = load_config(config)
     fit_hidden_coordinate_probes(cfg, _repo_root())
     _print({"run_id": cfg.run_id, "status": "probes_complete"})
+
+
+@probes_app.command("baseline")
+def probes_baseline(run: Annotated[str, typer.Option("--run")]) -> None:
+    """Fit the EXPLORATORY surface-feature baseline for a completed run.
+
+    Reads the run's dataset and config only; no activations and no model are loaded.
+    This analysis is not preregistered, writes only under `exploratory/`, and changes
+    no H1-H8 status.
+    """
+    output = fit_surface_baseline(_run_path(run))
+    _print(
+        {
+            "output_dir": output,
+            "analysis_role": "exploratory_non_confirmatory",
+            "status": "surface_baseline_complete",
+        }
+    )
 
 
 @metrics_app.command("evaluate")
