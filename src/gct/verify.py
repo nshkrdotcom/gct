@@ -5,16 +5,62 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import numpy as np
+from safetensors.numpy import load_file
+
 from gct.config import load_config
 from gct.data.generate import validate_dataset_path
 from gct.pipeline import _complete
 from gct.storage.hashes import canonical_hash, file_hash
 from gct.storage.manifests import read_json, verify_artifact
 
+UNOBSERVABLE_CONTROL_GROUPS = (
+    "primary-unobservable-coordinate-pressure-shift",
+    "renamed-unobservable-coordinate-pressure-shift",
+)
+
 
 def _verify_record(record: dict[str, Any], run_dir: Path, errors: list[str]) -> None:
     if {"path", "sha256", "bytes"}.issubset(record):
         errors.extend(verify_artifact(record, run_dir))
+
+
+def unobservable_control_errors(run_dir: Path) -> list[str]:
+    """Assert the identical-prompt arm is degenerate exactly as its design requires.
+
+    In that arm the pressure-shift source and target prompts are byte-identical, so
+    deterministic activations are identical, so the transport residual is identically
+    zero and the fitted probe must collapse to intercept-only. A non-zero coefficient
+    or a non-zero residual PCA variance means the residual was not zero, which can only
+    happen if the hidden coordinate reached the rendered prompt. That is the prompt-
+    rendering defect this check exists to catch; the endpoint statistic itself cannot
+    catch it, because a zero residual makes the statistic invariant to model and layer.
+    """
+    errors: list[str] = []
+    for slug in UNOBSERVABLE_CONTROL_GROUPS:
+        path = run_dir / "probes" / slug / "pressure_probe.safetensors"
+        if not path.is_file():
+            errors.append(f"identical-prompt control probe is missing: {path}")
+            continue
+        tensors = load_file(str(path))
+        coefficient = tensors.get("coefficient")
+        variance = tensors.get("pca_variance")
+        if coefficient is None or variance is None:
+            errors.append(f"identical-prompt control probe {slug} lacks fitted probe tensors")
+            continue
+        if np.any(coefficient):
+            errors.append(
+                f"identical-prompt control probe {slug} has a non-zero coefficient "
+                f"(max |c| {float(np.abs(coefficient).max()):.6g}); the byte-identical arm "
+                "leaked a non-zero transport residual"
+            )
+        elif np.any(variance):
+            errors.append(
+                f"identical-prompt control probe {slug} has non-zero residual variance "
+                f"(max {float(np.abs(variance).max()):.6g}); the byte-identical arm "
+                "leaked a non-zero transport residual"
+            )
+    return errors
 
 
 def verify_run(run_dir: Path) -> dict[str, Any]:
@@ -85,6 +131,12 @@ def verify_run(run_dir: Path) -> dict[str, Any]:
             path = run_dir / str(shard["path"])
             if not path.is_file() or file_hash(path) != shard.get("sha256"):
                 errors.append(f"invalid behavior shard {path}")
+    if "probes" in manifests:
+        # The H6 endpoint statistic is degenerate by construction and cannot fail, so it
+        # is not a leakage test. Assert the degeneracy itself instead: that is the fact a
+        # prompt-rendering regression would actually break, and it is checked for every
+        # run rather than only for scientific Model #2 runs.
+        errors.extend(unobservable_control_errors(run_dir))
     selection_path = run_dir / "operators" / "selection_frozen.json"
     if selection_path.is_file():
         selection = read_json(selection_path)
@@ -171,7 +223,7 @@ def verify_run(run_dir: Path) -> dict[str, Any]:
             if set(hypotheses) != {f"H{index}" for index in range(1, 9)}:
                 errors.append("Model #2 does not report every preregistered H1-H8 endpoint")
             elif hypotheses["H6"].get("status") != "control_pass":
-                errors.append("Model #2 H6 negative control failed; scientific run is contaminated")
+                errors.append("Model #2 H6 recorded a status other than control_pass")
         cross_manifest_path = run_dir / "cross_model" / "manifest.json"
         if not cross_manifest_path.is_file():
             errors.append("Model #2 paired cross-model manifest is missing")
