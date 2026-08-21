@@ -17,7 +17,7 @@ This report is generated from run `gct-v0.2-phi4mini-7a87777ac843` and recorded 
 - Layers/hidden size: 32 / 3072
 - Runtime-discovered parameters/checkpoint bytes: `3836021760` / `7672066216`
 - Hashed checkpoint/config/tokenizer/code files: `23`
-- Repository commit at report build: `7dc7fbb465a713ea40cac2b5f6c9a2e7914258d3`
+- Repository commit at report build: `4742559aab9f82d01d7aa43b00f832559dd4ebbc`
 - Config hash: `7a87777ac8437e32b5adf586924a53914ca313aa2d061defccdd0f28c82687be`
 - Dependency lock hash: `f5d6ff10b891fbb7246e548626cbafe03b971b494abfb102e10f2fab8e0f051c`
 
@@ -35,7 +35,18 @@ The run includes deterministic ToyThermo oracle data; explicit, inferable, ident
 - Probe permutation replicates: 1000
 - Model-adapter anchor audit: `a37bc57cc578bfe16936c646812752d14a493c895ea7772a026facc3be7f2584`; token suffix `[200020, 200019, 176019, 28]`
 - Pre-test preregistration freeze: `d651077214ff4d6762f580594e1d33107736370c48caf108fdd727ba5e11390e`
-- Final command-level gates have not yet been recorded in `quality_gates.json`; rerun the README audit commands before interpreting this report as a final handoff.
+- Tests: `72 passed, 2 opt-in real-model tests skipped in 11.46s` (`uv run pytest -q`)
+- Lint: `All checks passed`
+- Format: `97 files already formatted`
+- Type checking: `No issues in 59 source files`
+- Real-model integration: `Qwen: 1 passed in 6.29s; Phi: 1 passed in 6.32s; CUDA BF16, every layer, deterministic repeated generation`
+- Split validation: `valid: 12,600 rows, 420 disjoint base-world groups, 840 unobservable pairs, exact frozen split/magnitude holdouts`
+- Deterministic regeneration: `two regenerations matched dd44cbc...84f; Model #1/Model #2 Parquet SHA-256 both 59bd8a17...c3f4 and stable IDs/groups/splits matched exactly`
+- Prompt-anchor audit: `12,600 rows/10,080 unique prompts; suffix [200020, 200019, 176019, 28]; all arms/worlds/renderers/transforms; 0 token-control mismatches`
+- Exact duplicate-prompt audit: `0/2,520 activation-row mismatches across 83,160 embedding/layer comparisons; 0/2,520 response mismatches; unobservable subsets 0/840 and 0/840`
+- Artifact verification: `Model #2 valid=true/scientifically_complete=true, 7 stages, 0 errors/warnings; Model #1 valid and fingerprint unchanged at 9ae67526...7dd0e`
+- Figure reproducibility: `five Model #2 and seven cross-model regenerated PNG hashes matched exactly across consecutive builds`
+- Placeholder audit: `no unfinished implementation marker, production mock/dummy backend, whitespace error, or endpoint placeholder remains`
 
 Held-out primary behavior metrics (grouped bootstrap by base world):
 
@@ -122,5 +133,7 @@ The single most informative follow-up is a new v0.3 preregistration that changes
 
 ## 13. Git state
 
-- Commit at report build: `7dc7fbb465a713ea40cac2b5f6c9a2e7914258d3`
-- Remote configured / push attempted / push verified: not yet recorded
+- Commit at report build: `4742559aab9f82d01d7aa43b00f832559dd4ebbc`
+- Remote configured: `True` (`origin (n:nshkrdotcom/gct.git)`)
+- Push attempted: `True`
+- Push verified: `True` at `4742559aab9f82d01d7aa43b00f832559dd4ebbc`
