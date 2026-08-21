@@ -17,7 +17,7 @@ This report is generated from run `gct-v0.1-db5a41461117` and recorded artifact 
 - Layers/hidden size: 36 / 2560
 - Runtime-discovered parameters/checkpoint bytes: `None` / `None`
 - Hashed checkpoint/config/tokenizer/code files: `0`
-- Repository commit at report build: `9a6c5ab172fe82d41f4f34dc528f77fbf588f5fb`
+- Repository commit at report build: `bf3010f216796634c14840a53f69600c25539280`
 - Config hash: `db5a414611170ba43e29ab33a3e2a614056b423ef072ab8e594f038a0c231018`
 - Dependency lock hash: `a2b3ea8d47104ad3ecabb28b77c58305847059e5776e4550a287298834c5b6b0`
 
@@ -115,7 +115,7 @@ The single most informative follow-up is a preregistered replication on a second
 
 ## 13. Git state
 
-- Commit at report build: `9a6c5ab172fe82d41f4f34dc528f77fbf588f5fb`
+- Commit at report build: `bf3010f216796634c14840a53f69600c25539280`
 - Remote configured: `True` (`origin (n:nshkrdotcom/gct.git)`)
 - Push attempted: `True`
 - Push verified: `True` at `62eaf2be781361694530f8d5d98e366bf87182ad`

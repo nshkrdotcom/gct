@@ -17,7 +17,7 @@ This report is generated from run `gct-v0.2-phi4mini-7a87777ac843` and recorded 
 - Layers/hidden size: 32 / 3072
 - Runtime-discovered parameters/checkpoint bytes: `3836021760` / `7672066216`
 - Hashed checkpoint/config/tokenizer/code files: `23`
-- Repository commit at report build: `9a6c5ab172fe82d41f4f34dc528f77fbf588f5fb`
+- Repository commit at report build: `bf3010f216796634c14840a53f69600c25539280`
 - Config hash: `7a87777ac8437e32b5adf586924a53914ca313aa2d061defccdd0f28c82687be`
 - Dependency lock hash: `f5d6ff10b891fbb7246e548626cbafe03b971b494abfb102e10f2fab8e0f051c`
 
@@ -133,7 +133,7 @@ The single most informative follow-up is a new v0.3 preregistration that changes
 
 ## 13. Git state
 
-- Commit at report build: `9a6c5ab172fe82d41f4f34dc528f77fbf588f5fb`
+- Commit at report build: `bf3010f216796634c14840a53f69600c25539280`
 - Remote configured: `True` (`origin (n:nshkrdotcom/gct.git)`)
 - Push attempted: `True`
 - Push verified: `True` at `4742559aab9f82d01d7aa43b00f832559dd4ebbc`
