@@ -12,7 +12,9 @@ The narrower candidate contribution is the conjunction of:
 4. behavior/error association beyond prompt-length and norm controls;
 5. residual recovery of an inferable omitted coordinate;
 6. explicit base lift compared with matched irrelevant Q;
-7. byte-identical unobservable-coordinate pairs that must fail;
+7. byte-identical unobservable-coordinate pairs that must fail (a rendering check only: their
+   residual is zero by construction, so the endpoint has no power against model-side leakage —
+   `docs/LIMITATIONS.md`);
 8. semantic renaming and frozen-test discipline.
 
 Transformation-equivariant learning, latent flow fields, truth-vector geometry, probes, causal

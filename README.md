@@ -71,8 +71,9 @@ See [REPRODUCIBILITY.md](docs/REPRODUCIBILITY.md), [METHODS.md](docs/METHODS.md)
 machine-readable preregistration in the full config. Generated evidence is summarized in `REPORT.md`
 for Model #1, `REPORT_MODEL2.md` for Phi, and `REPORT_CROSS_MODEL.md` for the paired stable-ID/base-
 world comparison. The broad reusable-transport null replicated; Phi alone supported H5 residual-
-coordinate decodability while both H6 negative controls passed. H7/H8 remained unsupported, so the
-result is not evidence of causal use, ontology, or universal truth geometry.
+coordinate decodability. H7/H8 remained unsupported, so the result is not evidence of causal use,
+ontology, or universal truth geometry. The H6 identical-prompt arm passed in both families, but it
+is degenerate by construction and could not have failed; see `docs/LIMITATIONS.md`.
 
 ## Quality gates
 

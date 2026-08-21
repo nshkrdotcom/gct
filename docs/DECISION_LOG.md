@@ -4,6 +4,11 @@
 - Store transformer layers separately from the embedding output to eliminate indexing ambiguity.
 - Use byte-identical unobservable pressure-shift prompts. This makes above-null pressure decoding an
   immediate contamination signal.
+  - 2026-08-21 correction: byte-identical prompts also make the residual identically zero, so this
+    endpoint cannot signal contamination that originates in the model rather than in prompt
+    rendering. Its statistic is invariant to model, layer, and prompt world and is bit-identical
+    across both completed families. The design decision stands as a rendering check; the claim that
+    it detects contamination generally does not (`docs/LIMITATIONS.md`).
 - Treat semantic renaming as one first-class arm with all four coordinate subconditions so H2/H5/H7
   can actually be repeated, rather than renaming only one prompt type.
 - Use factored reduced-rank regression rather than an optimizer-dependent neural fit. Forward
@@ -64,4 +69,5 @@
 - The frozen Phi result is Level 1: H1 is distinguishable but wrong-sign; H2/H3/H4/H7/H8 are not
   supported; H5 is supported; and H6 passes. The permitted interpretation is a broad second-family
   simple-transport null plus family-dependent residual decodability without a uniquely useful base lift,
-  causal-use evidence, or universal ontology.
+  causal-use evidence, or universal ontology. The H6 pass carries no weight in that interpretation;
+  see the 2026-08-21 correction above.

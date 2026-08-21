@@ -76,7 +76,10 @@ primary. The experiment reports transport, cycle, commuting-square, matching/des
 composition proxies, raw values, and identity-normalized values where the denominator is nonzero.
 
 Residual pressure probes report held-out R2 and MAE over preregistered PCA dimensions. Each grouped
-permutation replicate refits coefficients and repeats validation dimension selection. Bootstrap
+permutation replicate refits coefficients and repeats validation dimension selection. In the
+unobservable arm the paired prompts are byte-identical, so the residual is the zero matrix and the
+probe is intercept-only; that arm's statistic is therefore invariant to model, layer, and prompt
+world and is a pipeline check rather than a powered test (`docs/LIMITATIONS.md`). Bootstrap
 confidence intervals resample base worlds. Exploratory test layer p-values receive Benjamini-Hochberg
 FDR correction. Behavior-link regressions compare defect features against character/token length,
 activation norm, and oracle-delta controls.

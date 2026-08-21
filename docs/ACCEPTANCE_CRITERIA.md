@@ -29,6 +29,9 @@ This checklist is updated from actual artifacts during final review. “Implemen
   post-canonicalization audit.
 - [x] Validation-only layer/operator/probe selection frozen before test evaluation.
 - [x] All H1–H8 endpoints and controls evaluated; H6 mandatory and passing in primary/renamed worlds.
+  Recorded after the fact: that pass is degenerate by construction and could not have failed
+  (`docs/LIMITATIONS.md`). The check with content is the stored control probe's exact degeneracy,
+  now asserted by `gct verify`.
 - [x] Stable-ID/base-world paired cross-model analysis, seven required figures, and schema-validated JSON.
 - [x] Actual-evidence `REPORT_MODEL2.md` and `REPORT_CROSS_MODEL.md` generated.
 - [x] Final Model #2 tests/lint/format/typecheck/real integration/hash/regeneration gates recorded.

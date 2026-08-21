@@ -12,11 +12,14 @@ Beck-Chevalley maps, or holonomy. The implemented pressure/concentration square 
 update, not a claimed categorical pullback.
 
 Truth labels come only from the Python ToyThermo oracle. A low latent defect can coexist with a wrong
-answer, and a coherent model can encode a coherent false world. This is why behavior and the
-identical-prompt unobservable control are primary parts of the protocol.
+answer, and a coherent model can encode a coherent false world. This is why behavior is a primary
+part of the protocol. The identical-prompt unobservable control is not a second guard here: its
+residual is zero by construction, so it can only detect a prompt-rendering defect, never model-side
+leakage (`docs/LIMITATIONS.md`).
 
 The strongest v0 claim available is conditional: an inferable omitted coordinate is recoverable from
-held-out residuals above a grouped permutation null, the identical-prompt unobservable version is not,
-explicit exposure improves held-out structure and behavior, irrelevant Q does not, and the result
-survives renaming. Even that would be candidate transport structure, not discovery of a universal
+held-out residuals above a grouped permutation null, explicit exposure improves held-out structure
+and behavior, irrelevant Q does not, and the result survives renaming. The identical-prompt
+unobservable version is not recoverable, but that clause is true by construction and adds no
+conditional strength. Even that would be candidate transport structure, not discovery of a universal
 ontology.
